@@ -599,7 +599,7 @@
         <div class="main-content">
             <!-- 图表区域 -->
             <div class="chart-container">
-                <div class="chart-title">总账户价值</div>
+                <div class="chart-title">总账户价值 (每15分钟AI判断时更新) 🚀PM2热重载已启用</div>
                 <div class="chart-wrapper">
                     <canvas id="performanceChart"></canvas>
                 </div>
@@ -707,6 +707,8 @@
         let performanceChart = null;
         let updateInterval = null;
         let previousValues = {}; // 存储之前的值用于动画
+        let lastSignalTimestamp = null; // 记录最后一次AI判断的时间戳
+        let chartDataPoints = []; // 存储图表数据点(每15分钟AI判断时添加)
 
         // 数字翻动动画函数
         function animateNumber(element, newValue, decimals = 2) {
@@ -737,9 +739,80 @@
             }, duration / steps);
         }
 
+        // 初始化图表数据 - 从AI判断历史构建（每15分钟一个点）
+        async function initializeChartData() {
+            try {
+                const signalsResponse = await fetch('/api/signals');
+                const signals = await signalsResponse.json();
+                
+                console.log('🔧 初始化图表: 加载历史AI判断数据');
+                console.log('   历史AI判断信号数量:', signals.length);
+                
+                if (signals.length > 0) {
+                    // 获取最新信号时间戳，设置为已处理，避免重复添加
+                    lastSignalTimestamp = signals[0].timestamp;
+                    console.log('   最新AI判断时间:', lastSignalTimestamp);
+                    
+                    // 从最近的AI判断构建图表数据点(最多20个历史点，即5小时历史)
+                    // 注意：这里不要reverse，保持时间顺序（旧到新）
+                    const recentSignals = signals.slice(0, 20);
+                    
+                    const dashResponse = await fetch('/api/dashboard');
+                    const dashData = await dashResponse.json();
+                    const model = dashData.models['DeepSeek Chat V3.1'];
+                    
+                    if (model) {
+                        // 为每次AI判断添加一个数据点（按时间顺序：旧到新）
+                        recentSignals.forEach(signal => {
+                            const date = new Date(signal.timestamp);
+                            const timeLabel = date.toLocaleTimeString('zh-CN', { 
+                                hour: '2-digit', 
+                                minute: '2-digit',
+                                hour12: false 
+                            });
+                            
+                            chartDataPoints.push({
+                                label: timeLabel,
+                                value: model.account_value, // 使用当前账户价值
+                                timestamp: signal.timestamp
+                            });
+                        });
+                        
+                        // 更新图表显示
+                        if (performanceChart && chartDataPoints.length > 0) {
+                            const labels = chartDataPoints.map(point => point.label);
+                            const values = chartDataPoints.map(point => point.value);
+                            
+                            performanceChart.data.labels = labels;
+                            performanceChart.data.datasets[0].data = values;
+                            
+                            // 设置Y轴自适应范围
+                            const minValue = Math.min(...values);
+                            const maxValue = Math.max(...values);
+                            const range = maxValue - minValue;
+                            const padding = Math.max(range * 0.1, 1); // 10%的边距，至少1美元
+                            
+                            performanceChart.options.scales.y.min = Math.max(0, minValue - padding);
+                            performanceChart.options.scales.y.max = maxValue + padding;
+                            
+                            performanceChart.update();
+                            
+                            console.log('✅ 图表初始化完成:', chartDataPoints.length, '个数据点 (对应', chartDataPoints.length, '次AI判断)');
+                            console.log('   Y轴范围:', (minValue - padding).toFixed(2), '-', (maxValue + padding).toFixed(2));
+                        }
+                    }
+                } else {
+                    console.log('⚠️ 暂无AI判断历史，图表将在首次AI判断后开始显示');
+                }
+            } catch (error) {
+                console.error('❌ 初始化图表数据失败:', error);
+            }
+        }
+
         // 初始化
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             initializeChart();
+            await initializeChartData(); // 先初始化图表数据
             loadDashboardData();
             setupTabs();
             startAutoUpdate();
@@ -791,21 +864,33 @@
                 data: {
                     labels: [],
                     datasets: [{
-                        label: '账户价值',
+                        label: '账户价值 (AI每15分钟判断时更新)',
                         data: [],
                         borderColor: '#667eea',
                         backgroundColor: 'rgba(102, 126, 234, 0.1)',
                         borderWidth: 2,
                         fill: true,
-                        tension: 0.4
+                        tension: 0.4,
+                        pointRadius: 5, // 增大点的大小，让每个AI判断点更明显
+                        pointHoverRadius: 7
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45,
+                                autoSkip: true,
+                                maxTicksLimit: 12 // 限制X轴标签数量，避免过于密集
+                            }
+                        },
                         y: {
                             beginAtZero: false,
+                            min: undefined, // 动态设置
+                            max: undefined, // 动态设置
                             ticks: {
                                 callback: function(value) {
                                     return '$' + value.toLocaleString();
@@ -815,7 +900,14 @@
                     },
                     plugins: {
                         legend: {
-                            display: false
+                            display: true
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return '账户价值: $' + context.parsed.y.toFixed(2);
+                                }
+                            }
                         }
                     }
                 }
@@ -842,18 +934,44 @@
                 const response = await fetch('/api/dashboard');
                 const data = await response.json();
                 
-                console.log('📊 收到Dashboard数据:', {
-                    timestamp: data.last_update,
-                    crypto_count: Object.keys(data.crypto_prices || {}).length,
-                    model_count: Object.keys(data.models || {}).length
-                });
+                console.log('📊 收到Dashboard数据 (每5秒刷新，但图表仅在AI判断时更新)');
                 
+                // 检查是否有新的AI判断（信号）
+                const signalsResponse = await fetch('/api/signals');
+                const signals = await signalsResponse.json();
+                
+                let hasNewSignal = false;
+                if (signals.length > 0) {
+                    const latestSignalTimestamp = signals[0].timestamp;
+                    
+                    if (lastSignalTimestamp === null) {
+                        // 首次运行，仅记录时间戳，不添加点（因为initializeChartData已经处理）
+                        lastSignalTimestamp = latestSignalTimestamp;
+                        console.log('✅ 初始化完成，当前最新AI判断时间:', latestSignalTimestamp);
+                    } else if (lastSignalTimestamp !== latestSignalTimestamp) {
+                        hasNewSignal = true;
+                        lastSignalTimestamp = latestSignalTimestamp;
+                        console.log('🎯 【检测到新的AI判断】时间:', latestSignalTimestamp, '-> 图表将添加新数据点');
+                    }
+                }
+                
+                // 更新其他模块(每5秒刷新，保持实时性)
                 updateCryptoPrices(data.crypto_prices);
                 updateModelPerformance(data.models);
-                updatePerformanceChart(data.performance_history);
                 updateFooterModels(data.models);
                 
-                setTimeout(hideUpdateIndicator, 500); // 0.5秒后隐藏指示器
+                // 【关键】只在有新的AI判断时更新图表（每15分钟一次）
+                if (hasNewSignal) {
+                    const model = data.models['DeepSeek Chat V3.1'];
+                    if (model) {
+                        updatePerformanceChart(model.account_value, lastSignalTimestamp);
+                        console.log('✅ 图表已添加新数据点 (账户价值: $' + model.account_value.toFixed(2) + ', 15分钟间隔)');
+                    }
+                } else {
+                    console.log('⏸️  暂无新AI判断，图表保持不变 (等待下一个15分钟整点)');
+                }
+                
+                setTimeout(hideUpdateIndicator, 500);
                 
             } catch (error) {
                 hideUpdateIndicator();
@@ -917,19 +1035,57 @@
             }
         }
 
-        // 更新性能图表
-        function updatePerformanceChart(history) {
-            if (performanceChart && history.length > 0) {
-                const labels = history.map(h => {
-                    const date = new Date(h.timestamp);
-                    return date.toLocaleTimeString();
-                });
-                const values = history.map(h => h.account_value);
-                
-                performanceChart.data.labels = labels;
-                performanceChart.data.datasets[0].data = values;
-                performanceChart.update();
+        // 更新性能图表 - 【核心】只在AI每15分钟做判断时添加新数据点
+        function updatePerformanceChart(accountValue, timestamp) {
+            if (!performanceChart) {
+                console.warn('⚠️ 图表对象不存在，跳过更新');
+                return;
             }
+            
+            // 添加新数据点
+            const date = new Date(timestamp);
+            const timeLabel = date.toLocaleTimeString('zh-CN', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false 
+            });
+            
+            chartDataPoints.push({
+                label: timeLabel,
+                value: accountValue,
+                timestamp: timestamp
+            });
+            
+            // 保持最近96个点（24小时历史，每15分钟一个点 = 96个点）
+            if (chartDataPoints.length > 96) {
+                chartDataPoints = chartDataPoints.slice(-96);
+            }
+            
+            // 更新图表显示
+            const labels = chartDataPoints.map(point => point.label);
+            const values = chartDataPoints.map(point => point.value);
+            
+            performanceChart.data.labels = labels;
+            performanceChart.data.datasets[0].data = values;
+            
+            // 动态调整Y轴范围（自适应）
+            const minValue = Math.min(...values);
+            const maxValue = Math.max(...values);
+            const range = maxValue - minValue;
+            const padding = Math.max(range * 0.1, 1); // 10%的边距，至少1美元
+            
+            performanceChart.options.scales.y.min = Math.max(0, minValue - padding);
+            performanceChart.options.scales.y.max = maxValue + padding;
+            
+            performanceChart.update('active'); // 使用动画更新
+            
+            console.log('📈✅ 图表新增数据点:', {
+                时间: timeLabel,
+                账户价值: '$' + accountValue.toFixed(2),
+                数据点总数: chartDataPoints.length + '/96',
+                Y轴范围: '$' + (minValue - padding).toFixed(2) + ' - $' + (maxValue + padding).toFixed(2),
+                说明: 'AI每15分钟判断一次'
+            });
         }
 
         // 更新底部模型列表
@@ -1151,20 +1307,22 @@
             // 立即加载技术分析
             loadTechnicalAnalysis();
             
-            // 设置定时更新 - 5秒更新一次，快速响应
+            console.log('🚀 启动自动更新定时器:');
+            console.log('   - 加密货币价格、账户信息: 每5秒刷新');
+            console.log('   - 持仓金额图表: 仅在AI判断时更新 (每15分钟整点)');
+            
+            // 设置定时更新 - 每5秒刷新数据，但图表只在AI判断时更新
             updateInterval = setInterval(() => {
-                console.log('⏰ 自动更新数据...', new Date().toLocaleTimeString());
-                loadDashboardData();
+                loadDashboardData(); // 内部会判断是否有新AI信号来决定是否更新图表
                 loadTechnicalAnalysis();
                 
                 // 自动刷新当前活跃的标签页
                 const activeTab = document.querySelector('.tab.active');
                 if (activeTab) {
                     const tabName = activeTab.getAttribute('data-tab');
-                    console.log('🔄 自动刷新活跃标签页:', tabName);
                     loadTabData(tabName);
                 }
-            }, 5000); // 每5秒更新一次
+            }, 5000); // 每5秒轮询一次数据
         }
 
         // 页面卸载时清理

@@ -4,116 +4,163 @@
 
 ## 🚀 快速开始
 
-### 方法1：一键启动（推荐）
+### 一键部署（首次使用）
 ```bash
 cd /root/crypto_deepseek
-./start.sh
+./deploy.sh
+```
+
+### 一键启动
+```bash
+./run.sh
 ```
 
 这将自动启动：
 - 🤖 交易机器人（后台运行）
 - 📊 Web仪表板（前台运行）
 
-### 方法2：单独启动服务
-```bash
-# 只启动仪表板
-python trading_dashboard.py
-
-# 只启动交易机器人
-python trading_bots/deepseek_trading_bot.py
-```
-
 ### 访问界面
 - **本地**: http://localhost:5000
-- **外网**: http://8.217.194.162:5000
+- **外网**: http://your-server-ip:5000
 
-## ⚙️ 安装配置
+## ⚙️ 配置说明
 
-### 1. 克隆项目
+### 1. API 密钥配置
 ```bash
-git clone https://github.com/WilliamsMiao/Headache_trade.git
-cd Headache_trade
-```
-
-### 2. 创建虚拟环境
-```bash
-python3 -m venv myenv
-source myenv/bin/activate  # Linux/Mac
-# 或者
-myenv\Scripts\activate     # Windows
-```
-
-### 3. 安装依赖
-```bash
-pip install -r requirements.txt
-```
-
-### 4. 配置API密钥
-```bash
+# 复制配置模板
 cp .env.example .env
-nano .env  # 填写你的API密钥
+
+# 编辑配置文件
+nano .env
 ```
 
-需要配置：
-- `DEEPSEEK_API_KEY` - DeepSeek API密钥
+需要配置的 API 密钥：
+- `DEEPSEEK_API_KEY` - DeepSeek API密钥（从 https://platform.deepseek.com/ 获取）
 - `OKX_API_KEY` - OKX交易所API密钥
 - `OKX_SECRET` - OKX交易所密钥
 - `OKX_PASSWORD` - OKX交易所密码
 - `CRYPTORACLE_API_KEY` - CryptoOracle API（可选）
 
+### 2. 系统要求
+- Python 3.8+
+- Linux 系统（推荐 Ubuntu 20.04+）
+- 网络连接（用于访问 API 和交易所）
+
 ## 📁 项目结构
 
 ```
 crypto_deepseek/
-├── start.sh                     # 🆕 一键启动脚本
-├── .env.example                 # 配置模板
-├── trading_dashboard.py         # 主仪表板（带登录）
+├── deploy.sh                     # 🆕 一键部署脚本
+├── run.sh                        # 🆕 一键启动脚本
+├── .env.example                  # 环境变量配置模板
+├── trading_dashboard.py          # Web 仪表板
 ├── trading_bots/
-│   ├── deepseek_trading_bot.py  # 主要交易机器人
-│   ├── deepseek_enhanced.py     # 增强版
-│   ├── deepseek_basic.py        # 基础版
-│   └── deepseek_simple.py       # 简化版
+│   └── deepseek_trading_bot.py   # 主交易机器人
 ├── templates/
 │   ├── login.html               # 登录配置页面
 │   └── arena.html              # Arena 交易界面
-├── scripts/                     # 辅助脚本
 ├── static/                      # 静态文件
-└── requirements.txt             # 依赖包
+├── data/                        # 数据文件
+├── logs/                        # 日志文件
+├── scripts/
+│   ├── check_status.sh          # 状态检查脚本
+│   └── test_dashboard.py        # 测试工具
+└── requirements.txt             # Python 依赖包
 ```
 
 ## 🔐 使用流程
 
-1. **访问登录页面**: 填写 API 配置
-2. **验证连接**: 系统自动验证 OKX 交易所
-3. **进入 Arena**: 验证成功后访问交易仪表板
-4. **监控交易**: 查看实时数据和性能
+1. **部署系统**: 运行 `./deploy.sh` 完成环境配置
+2. **配置 API**: 编辑 `.env` 文件填写 API 密钥
+3. **启动系统**: 运行 `./run.sh` 启动服务
+4. **访问界面**: 浏览器打开 http://localhost:5000
+5. **配置交易**: 在登录页面填写 API 配置
+6. **开始交易**: 验证成功后进入 Arena 交易界面
+
+## 🛠️ 管理命令
+
+### 基本操作
+```bash
+# 部署系统（首次使用）
+./deploy.sh
+
+# 启动系统
+./run.sh
+
+# 查看交易机器人日志
+tail -f logs/bot.log
+
+# 检查系统状态
+./scripts/check_status.sh
+```
+
+### 进程管理
+```bash
+# 停止交易机器人
+pkill -f deepseek_trading_bot.py
+
+# 停止仪表板
+pkill -f trading_dashboard.py
+
+# 重启系统
+pkill -f deepseek_trading_bot.py && ./run.sh
+```
 
 ## 📋 配置要求
 
-- DeepSeek API Key
-- OKX API Key / Secret / Password
-- 钱包地址（可选）
+### 必需配置
+- DeepSeek API Key（用于 AI 分析）
+- OKX API Key / Secret / Password（用于交易）
+
+### 可选配置
+- CryptoOracle API Key（用于情绪分析）
+- 钱包地址（用于资金管理）
 
 ## 🔒 安全说明
 
 ⚠️ **重要提醒：**
-- `.env` 文件包含敏感信息，**绝不会**被上传到Git
-- 所有API密钥从环境变量读取
-- 建议为API密钥设置IP白名单
-- 定期更换API密钥
+- `.env` 文件包含敏感信息，**绝不会**被上传到 Git
+- 所有 API 密钥从环境变量读取
+- 建议为 API 密钥设置 IP 白名单
+- 定期更换 API 密钥
+- 不要在公共场合泄露密钥
 
-## 🛠️ 脚本工具
+## 🐛 故障排除
 
-- `start.sh` - 🆕 一键启动完整系统
-- `scripts/start_dashboard.sh` - 单独启动仪表板
-- `scripts/check_status.sh` - 检查服务状态
-- `scripts/test_login.sh` - 测试登录功能
+### 常见问题
 
-## 📚 相关文档
+1. **部署失败**
+   ```bash
+   # 检查 Python 版本
+   python3 --version
+   
+   # 手动安装依赖
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
 
-- `GITHUB_PUSH_GUIDE.md` - GitHub推送指南
-- `部署完成总结.md` - 部署说明
-- `OKX账户升级指南.md` - OKX配置指南
+2. **启动失败**
+   ```bash
+   # 检查配置文件
+   cat .env
+   
+   # 查看错误日志
+   tail -f logs/bot.log
+   ```
+
+3. **API 连接失败**
+   - 检查网络连接
+   - 验证 API 密钥是否正确
+   - 确认 API 权限设置
+
+## 📚 技术栈
+
+- **后端**: Python 3.8+, Flask
+- **AI**: DeepSeek API
+- **交易**: OKX API (CCXT)
+- **数据**: Pandas, NumPy
+- **前端**: HTML5, CSS3, JavaScript
 
 ## 🤝 贡献
 
@@ -126,4 +173,3 @@ MIT License
 ---
 
 🎉 **享受智能交易系统！** 📈🚀
-

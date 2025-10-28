@@ -11,38 +11,33 @@ echo "========================================"
 cd /root/crypto_deepseek || exit 1
 
 # 检查虚拟环境
-if [ -d "myenv" ]; then
-    VENV_PATH="myenv"
-elif [ -d "venv" ]; then
-    VENV_PATH="venv"
-else
-    echo "❌ 未找到虚拟环境目录 (myenv 或 venv)"
-    echo "请先创建虚拟环境: python3 -m venv myenv"
+if [ ! -d "venv" ]; then
+    echo "❌ 未找到虚拟环境目录 venv"
+    echo "请先运行部署脚本: ./deploy.sh"
     exit 1
 fi
 
-echo "✓ 找到虚拟环境: $VENV_PATH"
+echo "✓ 找到虚拟环境: venv"
 
 # 激活虚拟环境
-source $VENV_PATH/bin/activate
+source venv/bin/activate
 
 # 检查依赖
 echo ""
 echo "📦 检查依赖包..."
 if ! python -c "import ccxt, openai, flask" 2>/dev/null; then
-    echo "⚠️  缺少依赖包，正在安装..."
-    pip install -q -r requirements.txt
-    echo "✓ 依赖包安装完成"
-else
-    echo "✓ 依赖包已安装"
+    echo "❌ 缺少依赖包，请先运行: ./deploy.sh"
+    exit 1
 fi
+
+echo "✓ 依赖包检查通过"
 
 # 检查.env配置文件
 echo ""
 echo "🔐 检查配置文件..."
 if [ ! -f .env ]; then
     echo "❌ 未找到 .env 配置文件"
-    echo "请复制 .env.example 并填写你的API密钥:"
+    echo "请复制配置模板并填写你的API密钥:"
     echo "   cp .env.example .env"
     echo "   nano .env"
     exit 1
@@ -83,12 +78,13 @@ echo "✓ 交易机器人已启动 (PID: $BOT_PID)"
 echo "  日志文件: logs/bot.log"
 
 # 等待机器人初始化
-sleep 2
+sleep 3
 
 # 检查机器人是否正常运行
 if ! ps -p $BOT_PID > /dev/null; then
     echo "❌ 交易机器人启动失败，请查看日志: logs/bot.log"
-    tail -n 20 logs/bot.log
+    echo "最近日志内容:"
+    tail -n 10 logs/bot.log
     exit 1
 fi
 
@@ -101,22 +97,37 @@ echo "✅ 系统启动成功！"
 echo ""
 echo "📍 访问地址:"
 echo "   本地: http://localhost:5000"
-echo "   外网: http://$(curl -s ifconfig.me):5000"
+echo "   外网: http://$(curl -s ifconfig.me 2>/dev/null || echo 'your-server-ip'):5000"
 echo ""
 echo "📂 日志文件:"
 echo "   交易机器人: logs/bot.log"
 echo "   仪表板: 当前终端"
 echo ""
+echo "🔧 管理命令:"
+echo "   查看机器人日志: tail -f logs/bot.log"
+echo "   重启机器人: pkill -f deepseek_trading_bot.py && ./run.sh"
+echo ""
 echo "⚠️  按 Ctrl+C 停止服务"
 echo "========================================"
 echo ""
+
+# 设置信号处理，确保退出时停止机器人
+cleanup() {
+    echo ""
+    echo "🛑 正在停止交易机器人..."
+    kill $BOT_PID 2>/dev/null
+    sleep 2
+    # 强制杀死如果还在运行
+    kill -9 $BOT_PID 2>/dev/null
+    echo "✓ 系统已完全停止"
+    exit 0
+}
+
+# 捕获 Ctrl+C 信号
+trap cleanup SIGINT SIGTERM
 
 # 启动仪表板
 python trading_dashboard.py
 
 # 如果仪表板退出，停止机器人
-echo ""
-echo "🛑 正在停止交易机器人..."
-kill $BOT_PID 2>/dev/null
-echo "✓ 系统已完全停止"
-
+cleanup
