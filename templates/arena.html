@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alpha Arena - 交易仪表板</title>
+    <title>Headache Trade - 交易仪表板</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -174,6 +174,121 @@
 
         .crypto-change.negative {
             color: #e74c3c;
+        }
+        
+        /* 价格变动动画效果 */
+        .crypto-item.price-updated {
+            animation: priceUpdatePulse 0.8s ease-in-out;
+        }
+        
+        .crypto-price.price-updated {
+            animation: priceFlash 0.6s ease-in-out;
+        }
+        
+        .crypto-change.price-updated {
+            animation: changeGlow 0.8s ease-in-out;
+        }
+        
+        @keyframes priceUpdatePulse {
+            0% { 
+                transform: scale(1);
+                box-shadow: 0 0 0 rgba(102, 126, 234, 0.4);
+            }
+            50% { 
+                transform: scale(1.05);
+                box-shadow: 0 0 20px rgba(102, 126, 234, 0.6);
+                background: rgba(102, 126, 234, 0.1);
+            }
+            100% { 
+                transform: scale(1);
+                box-shadow: 0 0 0 rgba(102, 126, 234, 0.4);
+            }
+        }
+        
+        @keyframes priceFlash {
+            0% { 
+                color: #2c3e50;
+                text-shadow: 0 0 0 rgba(102, 126, 234, 0);
+            }
+            50% { 
+                color: #667eea;
+                text-shadow: 0 0 10px rgba(102, 126, 234, 0.8);
+                font-weight: bold;
+            }
+            100% { 
+                color: #2c3e50;
+                text-shadow: 0 0 0 rgba(102, 126, 234, 0);
+            }
+        }
+        
+        @keyframes changeGlow {
+            0% { 
+                opacity: 1;
+                text-shadow: 0 0 0 rgba(0, 0, 0, 0);
+            }
+            50% { 
+                opacity: 0.8;
+                text-shadow: 0 0 8px currentColor;
+            }
+            100% { 
+                opacity: 1;
+                text-shadow: 0 0 0 rgba(0, 0, 0, 0);
+            }
+        }
+        
+        /* 上涨/下跌特殊效果 */
+        .crypto-item.price-up {
+            animation: priceUpEffect 1s ease-in-out;
+        }
+        
+        .crypto-item.price-down {
+            animation: priceDownEffect 1s ease-in-out;
+        }
+        
+        @keyframes priceUpEffect {
+            0% { 
+                transform: scale(1);
+                background: rgba(39, 174, 96, 0);
+                border-left: 3px solid transparent;
+            }
+            30% { 
+                transform: scale(1.03);
+                background: rgba(39, 174, 96, 0.1);
+                border-left: 3px solid #27ae60;
+            }
+            70% { 
+                transform: scale(1.02);
+                background: rgba(39, 174, 96, 0.05);
+                border-left: 3px solid #27ae60;
+            }
+            100% { 
+                transform: scale(1);
+                background: rgba(39, 174, 96, 0);
+                border-left: 3px solid transparent;
+            }
+        }
+        
+        @keyframes priceDownEffect {
+            0% { 
+                transform: scale(1);
+                background: rgba(231, 76, 60, 0);
+                border-left: 3px solid transparent;
+            }
+            30% { 
+                transform: scale(1.03);
+                background: rgba(231, 76, 60, 0.1);
+                border-left: 3px solid #e74c3c;
+            }
+            70% { 
+                transform: scale(1.02);
+                background: rgba(231, 76, 60, 0.05);
+                border-left: 3px solid #e74c3c;
+            }
+            100% { 
+                transform: scale(1);
+                background: rgba(231, 76, 60, 0);
+                border-left: 3px solid transparent;
+            }
         }
 
         .model-performance {
@@ -552,14 +667,10 @@
         <div class="header">
             <div class="header-top">
                 <div>
-                    <div class="logo">Alpha Arena</div>
+                    <div class="logo">Headache Trade</div>
                     <div class="logo-subtitle">by Trading Bot</div>
                 </div>
                 <nav class="nav">
-                    <a href="#models">模型</a>
-                    <a href="#positions">持仓</a>
-                    <a href="#trades">交易</a>
-                    <a href="#analysis">分析</a>
                     <a href="/logout" onclick="return confirm('确定要登出吗？')">
                         <i class="fas fa-sign-out-alt"></i> 登出
                     </a>
@@ -599,7 +710,7 @@
         <div class="main-content">
             <!-- 图表区域 -->
             <div class="chart-container">
-                <div class="chart-title">总账户价值 (每15分钟AI判断时更新) 🚀PM2热重载已启用</div>
+                <div class="chart-title">总账户价值</div>
                 <div class="chart-wrapper">
                     <canvas id="performanceChart"></canvas>
                 </div>
@@ -739,14 +850,54 @@
             }, duration / steps);
         }
 
-        // 初始化图表数据 - 从AI判断历史构建（每15分钟一个点）
+        // 初始化图表数据 - 从文件和历史AI判断构建（每15分钟一个点）
         async function initializeChartData() {
             try {
+                // 1. 首先尝试从文件加载图表历史数据
+                console.log('🔧 初始化图表: 尝试从文件加载历史数据');
+                const chartHistoryResponse = await fetch('/api/chart-history');
+                const chartHistoryData = await chartHistoryResponse.json();
+                
+                if (chartHistoryData.chart_points && chartHistoryData.chart_points.length > 0) {
+                    console.log('✅ 从文件加载图表历史:', chartHistoryData.total_points, '个数据点');
+                    chartDataPoints = chartHistoryData.chart_points;
+                    
+                    // 确保数据按时间顺序排列（旧到新）
+                    chartDataPoints.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                    
+                    // 更新图表显示
+                    if (performanceChart && chartDataPoints.length > 0) {
+                        const labels = chartDataPoints.map(point => point.label);
+                        const values = chartDataPoints.map(point => point.value);
+                        
+                        performanceChart.data.labels = labels;
+                        performanceChart.data.datasets[0].data = values;
+                        
+                        // 使用智能Y轴范围计算
+                        const yAxisRange = calculateSmartYAxisRange(values);
+                        performanceChart.options.scales.y.min = yAxisRange.min;
+                        performanceChart.options.scales.y.max = yAxisRange.max;
+                        
+                        performanceChart.update();
+                        
+                        // 计算波动幅度
+                        const minValue = Math.min(...values);
+                        const maxValue = Math.max(...values);
+                        const range = maxValue - minValue;
+                        const volatilityPercent = minValue > 0 ? (range / minValue * 100) : 0;
+                        
+                        console.log('✅ 图表从文件初始化完成:', chartDataPoints.length, '个数据点');
+                        console.log('   Y轴范围:', yAxisRange.min.toFixed(2), '-', yAxisRange.max.toFixed(2));
+                        console.log('   波动幅度:', volatilityPercent.toFixed(2) + '%');
+                        console.log('   最后更新时间:', chartHistoryData.last_updated);
+                    }
+                    return; // 成功从文件加载，直接返回
+                }
+                
+                // 2. 如果文件没有数据，从AI判断历史构建
+                console.log('⚠️ 文件无历史数据，从AI判断历史构建图表');
                 const signalsResponse = await fetch('/api/signals');
                 const signals = await signalsResponse.json();
-                
-                console.log('🔧 初始化图表: 加载历史AI判断数据');
-                console.log('   历史AI判断信号数量:', signals.length);
                 
                 if (signals.length > 0) {
                     // 获取最新信号时间戳，设置为已处理，避免重复添加
@@ -754,7 +905,6 @@
                     console.log('   最新AI判断时间:', lastSignalTimestamp);
                     
                     // 从最近的AI判断构建图表数据点(最多20个历史点，即5小时历史)
-                    // 注意：这里不要reverse，保持时间顺序（旧到新）
                     const recentSignals = signals.slice(0, 20);
                     
                     const dashResponse = await fetch('/api/dashboard');
@@ -763,7 +913,10 @@
                     
                     if (model) {
                         // 为每次AI判断添加一个数据点（按时间顺序：旧到新）
-                        recentSignals.forEach(signal => {
+                        // 注意：recentSignals是按时间倒序的，需要reverse来获得正确的时间顺序
+                        const sortedSignals = recentSignals.slice().reverse(); // 创建副本并反转
+                        
+                        sortedSignals.forEach(signal => {
                             const date = new Date(signal.timestamp);
                             const timeLabel = date.toLocaleTimeString('zh-CN', { 
                                 hour: '2-digit', 
@@ -778,6 +931,9 @@
                             });
                         });
                         
+                        // 保存到文件
+                        await saveChartDataToFile();
+                        
                         // 更新图表显示
                         if (performanceChart && chartDataPoints.length > 0) {
                             const labels = chartDataPoints.map(point => point.label);
@@ -786,19 +942,22 @@
                             performanceChart.data.labels = labels;
                             performanceChart.data.datasets[0].data = values;
                             
-                            // 设置Y轴自适应范围
-                            const minValue = Math.min(...values);
-                            const maxValue = Math.max(...values);
-                            const range = maxValue - minValue;
-                            const padding = Math.max(range * 0.1, 1); // 10%的边距，至少1美元
-                            
-                            performanceChart.options.scales.y.min = Math.max(0, minValue - padding);
-                            performanceChart.options.scales.y.max = maxValue + padding;
+                            // 使用智能Y轴范围计算
+                            const yAxisRange = calculateSmartYAxisRange(values);
+                            performanceChart.options.scales.y.min = yAxisRange.min;
+                            performanceChart.options.scales.y.max = yAxisRange.max;
                             
                             performanceChart.update();
                             
-                            console.log('✅ 图表初始化完成:', chartDataPoints.length, '个数据点 (对应', chartDataPoints.length, '次AI判断)');
-                            console.log('   Y轴范围:', (minValue - padding).toFixed(2), '-', (maxValue + padding).toFixed(2));
+                            // 计算波动幅度
+                            const minValue = Math.min(...values);
+                            const maxValue = Math.max(...values);
+                            const range = maxValue - minValue;
+                            const volatilityPercent = minValue > 0 ? (range / minValue * 100) : 0;
+                            
+                            console.log('✅ 图表从AI判断初始化完成:', chartDataPoints.length, '个数据点 (对应', chartDataPoints.length, '次AI判断)');
+                            console.log('   Y轴范围:', yAxisRange.min.toFixed(2), '-', yAxisRange.max.toFixed(2));
+                            console.log('   波动幅度:', volatilityPercent.toFixed(2) + '%');
                         }
                     }
                 } else {
@@ -806,6 +965,29 @@
                 }
             } catch (error) {
                 console.error('❌ 初始化图表数据失败:', error);
+            }
+        }
+
+        // 保存图表数据到文件
+        async function saveChartDataToFile() {
+            try {
+                const response = await fetch('/api/save-chart-history', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        chart_points: chartDataPoints
+                    })
+                });
+                
+                if (response.ok) {
+                    console.log('✅ 图表数据已保存到文件');
+                } else {
+                    console.warn('⚠️ 保存图表数据失败');
+                }
+            } catch (error) {
+                console.error('❌ 保存图表数据失败:', error);
             }
         }
 
@@ -986,6 +1168,16 @@
             
             console.log('💰 更新加密货币价格:', prices);
             
+            // 存储之前的价格数据用于比较
+            const previousPrices = {};
+            const existingItems = container.querySelectorAll('.crypto-item');
+            existingItems.forEach(item => {
+                const symbol = item.querySelector('.crypto-symbol').textContent;
+                const priceElement = item.querySelector('.crypto-price');
+                const priceText = priceElement.textContent.replace('$', '').replace(/,/g, '');
+                previousPrices[symbol] = parseFloat(priceText);
+            });
+            
             // 每次都重新渲染以确保数据同步
             container.innerHTML = '';
             
@@ -1001,12 +1193,33 @@
                 
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'crypto-item';
+                
+                // 检测价格变动并添加动画类
+                const previousPrice = previousPrices[symbol];
+                const currentPrice = data.price;
+                
+                if (previousPrice !== undefined) {
+                    if (currentPrice > previousPrice) {
+                        itemDiv.classList.add('price-up');
+                    } else if (currentPrice < previousPrice) {
+                        itemDiv.classList.add('price-down');
+                    } else {
+                        itemDiv.classList.add('price-updated');
+                    }
+                }
+                
                 itemDiv.innerHTML = `
                     <div class="crypto-symbol">${symbol}</div>
-                    <div class="crypto-price animated-number" data-value="${data.price}">$${data.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                    <div class="crypto-change ${changeClass}">${arrow} ${changeSymbol}${data.change.toFixed(2)}%</div>
+                    <div class="crypto-price animated-number price-updated" data-value="${data.price}">$${data.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                    <div class="crypto-change ${changeClass} price-updated">${arrow} ${changeSymbol}${data.change.toFixed(2)}%</div>
                 `;
+                
                 container.appendChild(itemDiv);
+                
+                // 添加动画结束后的清理
+                setTimeout(() => {
+                    itemDiv.classList.remove('price-updated', 'price-up', 'price-down');
+                }, 1000);
             });
         }
 
@@ -1032,11 +1245,42 @@
                 animateNumber(accountValueElement, model.account_value, 2);
                 document.getElementById('returnRate').textContent = `${changeSymbol}${model.change_percent.toFixed(2)}%`;
                 document.getElementById('positionCount').textContent = model.positions ? model.positions.length : 0;
+                document.getElementById('tradeCount').textContent = model.trade_count || 0;
             }
         }
 
+        // 智能Y轴范围计算函数
+        function calculateSmartYAxisRange(values) {
+            if (values.length === 0) return { min: 0, max: 100 };
+            
+            const minValue = Math.min(...values);
+            const maxValue = Math.max(...values);
+            const range = maxValue - minValue;
+            
+            // 智能边距计算
+            let padding;
+            if (range === 0) {
+                // 如果所有值都相同，使用固定边距
+                padding = Math.max(minValue * 0.05, 5); // 5%或至少5美元
+            } else if (range < minValue * 0.01) {
+                // 波动很小（<1%），使用较大边距让波动更明显
+                padding = Math.max(range * 2, minValue * 0.02); // 2倍波动或2%
+            } else if (range < minValue * 0.05) {
+                // 波动较小（1-5%），使用中等边距
+                padding = Math.max(range * 1.5, minValue * 0.01); // 1.5倍波动或1%
+            } else {
+                // 波动正常，使用标准边距
+                padding = Math.max(range * 0.1, minValue * 0.005); // 10%或0.5%
+            }
+            
+            const yMin = Math.max(0, minValue - padding);
+            const yMax = maxValue + padding;
+            
+            return { min: yMin, max: yMax };
+        }
+
         // 更新性能图表 - 【核心】只在AI每15分钟做判断时添加新数据点
-        function updatePerformanceChart(accountValue, timestamp) {
+        async function updatePerformanceChart(accountValue, timestamp) {
             if (!performanceChart) {
                 console.warn('⚠️ 图表对象不存在，跳过更新');
                 return;
@@ -1050,11 +1294,23 @@
                 hour12: false 
             });
             
-            chartDataPoints.push({
+            // 添加新数据点 - 确保按时间顺序插入
+            const newDataPoint = {
                 label: timeLabel,
                 value: accountValue,
                 timestamp: timestamp
-            });
+            };
+            
+            // 找到正确的插入位置（按时间顺序）
+            let insertIndex = chartDataPoints.length;
+            for (let i = 0; i < chartDataPoints.length; i++) {
+                if (new Date(timestamp) < new Date(chartDataPoints[i].timestamp)) {
+                    insertIndex = i;
+                    break;
+                }
+            }
+            
+            chartDataPoints.splice(insertIndex, 0, newDataPoint);
             
             // 保持最近96个点（24小时历史，每15分钟一个点 = 96个点）
             if (chartDataPoints.length > 96) {
@@ -1068,23 +1324,29 @@
             performanceChart.data.labels = labels;
             performanceChart.data.datasets[0].data = values;
             
-            // 动态调整Y轴范围（自适应）
+            // 使用智能Y轴范围计算
+            const yAxisRange = calculateSmartYAxisRange(values);
+            performanceChart.options.scales.y.min = yAxisRange.min;
+            performanceChart.options.scales.y.max = yAxisRange.max;
+            
+            performanceChart.update('active'); // 使用动画更新
+            
+            // 保存图表数据到文件
+            await saveChartDataToFile();
+            
+            // 计算波动幅度用于日志
             const minValue = Math.min(...values);
             const maxValue = Math.max(...values);
             const range = maxValue - minValue;
-            const padding = Math.max(range * 0.1, 1); // 10%的边距，至少1美元
-            
-            performanceChart.options.scales.y.min = Math.max(0, minValue - padding);
-            performanceChart.options.scales.y.max = maxValue + padding;
-            
-            performanceChart.update('active'); // 使用动画更新
+            const volatilityPercent = minValue > 0 ? (range / minValue * 100) : 0;
             
             console.log('📈✅ 图表新增数据点:', {
                 时间: timeLabel,
                 账户价值: '$' + accountValue.toFixed(2),
                 数据点总数: chartDataPoints.length + '/96',
-                Y轴范围: '$' + (minValue - padding).toFixed(2) + ' - $' + (maxValue + padding).toFixed(2),
-                说明: 'AI每15分钟判断一次'
+                Y轴范围: '$' + yAxisRange.min.toFixed(2) + ' - $' + yAxisRange.max.toFixed(2),
+                波动幅度: volatilityPercent.toFixed(2) + '%',
+                说明: 'AI每15分钟判断一次，智能Y轴自适应，数据已保存'
             });
         }
 

@@ -22,6 +22,7 @@ app.secret_key = 'crypto_deepseek_secret_key_2024'
 # 全局变量存储用户配置
 user_config = {}
 DASHBOARD_DATA_FILE = '/root/crypto_deepseek/data/dashboard_data.json'
+CHART_HISTORY_FILE = '/root/crypto_deepseek/data/chart_history.json'
 
 
 def load_dashboard_data_from_file():
@@ -40,6 +41,48 @@ def load_dashboard_data_from_file():
     except Exception as e:
         print(f"❌ 读取Dashboard数据失败: {e}")
         return None
+
+
+def load_chart_history_from_file():
+    """从JSON文件读取图表历史数据"""
+    try:
+        if not os.path.exists(CHART_HISTORY_FILE):
+            print("⚠️ 图表历史文件不存在，创建新文件")
+            return []
+        
+        with open(CHART_HISTORY_FILE, 'r', encoding='utf-8') as f:
+            fcntl.flock(f.fileno(), fcntl.LOCK_SH)  # 共享锁
+            data = json.load(f)
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # 释放锁
+        
+        return data.get('chart_points', [])
+    except Exception as e:
+        print(f"❌ 读取图表历史失败: {e}")
+        return []
+
+
+def save_chart_history_to_file(chart_points):
+    """保存图表历史数据到JSON文件"""
+    try:
+        os.makedirs(os.path.dirname(CHART_HISTORY_FILE), exist_ok=True)
+        
+        # 确保数据按时间顺序排列（旧到新）
+        sorted_points = sorted(chart_points, key=lambda x: x['timestamp'])
+        
+        data = {
+            'chart_points': sorted_points,
+            'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'total_points': len(sorted_points)
+        }
+        
+        with open(CHART_HISTORY_FILE, 'w', encoding='utf-8') as f:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)  # 排他锁
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # 释放锁
+        
+        print(f"✅ 图表历史已保存: {len(sorted_points)} 个数据点 (已按时间排序)")
+    except Exception as e:
+        print(f"❌ 保存图表历史失败: {e}")
 
 
 def validate_api_keys(config):
@@ -69,12 +112,14 @@ dashboard_data = {
             'change_percent': 0.0,
             'positions': [],
             'trades': [],
+            'trade_count': 0,
             'status': 'active',
             'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
     },
     'crypto_prices': {},
     'performance_history': [],
+    'chart_history': [],  # 新增图表历史数据
     'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 }
 
@@ -174,6 +219,14 @@ def update_dashboard_data():
                 model_data['positions'] = [file_data['position']]
             else:
                 model_data['positions'] = []
+            
+            # 更新交易信息
+            model_data['trades'] = file_data.get('trades', [])
+            model_data['trade_count'] = len(file_data.get('trades', []))
+        
+        # 3. 加载图表历史数据
+        chart_history = load_chart_history_from_file()
+        dashboard_data['chart_history'] = chart_history
         
         # 添加性能历史记录
         dashboard_data['performance_history'].append({
@@ -310,6 +363,40 @@ def get_signals():
         if data and 'signals' in data:
             return jsonify(data['signals'][-20:])  # 最近20个信号
         return jsonify([])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/chart-history')
+def get_chart_history():
+    """获取图表历史数据"""
+    try:
+        chart_history = load_chart_history_from_file()
+        return jsonify({
+            'chart_points': chart_history,
+            'total_points': len(chart_history),
+            'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/save-chart-history', methods=['POST'])
+def save_chart_history():
+    """保存图表历史数据"""
+    try:
+        data = request.get_json()
+        chart_points = data.get('chart_points', [])
+        
+        # 限制数据点数量，保持最近96个点（24小时历史）
+        if len(chart_points) > 96:
+            chart_points = chart_points[-96:]
+        
+        save_chart_history_to_file(chart_points)
+        
+        return jsonify({
+            'success': True,
+            'message': f'图表历史已保存，共{len(chart_points)}个数据点',
+            'total_points': len(chart_points)
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

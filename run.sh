@@ -131,3 +131,4 @@ python trading_dashboard.py
 
 # 如果仪表板退出，停止机器人
 cleanup
+
