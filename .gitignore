@@ -1,0 +1,79 @@
+# ============================================
+# Crypto DeepSeek 项目 .gitignore
+# ============================================
+
+# 敏感信息 - 绝对不能上传！
+.env
+*.env
+.env.*
+!.env.example
+
+# API密钥和配置文件
+config.ini
+secrets.json
+*_secrets.*
+*_keys.*
+
+# 虚拟环境
+myenv/
+venv/
+env/
+ENV/
+.venv/
+
+# Python缓存和编译文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 运行时数据和日志
+data/
+logs/
+*.log
+*.log.*
+
+# 交易数据备份
+*.db
+*.sqlite
+*.sqlite3
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 测试和覆盖率
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# 构建和分发
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# 系统文件
+Thumbs.db
+desktop.ini
+
+# 其他
+*.pid
+.cache/
+
