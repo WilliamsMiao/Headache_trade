@@ -422,7 +422,9 @@ def get_technical_analysis():
                 'sma_20': price_data.get('price', 0)  # 简化处理
             },
             'trend_analysis': {
-                'overall': technical_data.get('trend', '震荡整理')
+                'overall': technical_data.get('trend', '震荡整理'),
+                'trend_strength': technical_data.get('trend_strength', 'N/A'),
+                'price_level': technical_data.get('price_level', 'N/A')
             },
             'levels_analysis': {}
         })

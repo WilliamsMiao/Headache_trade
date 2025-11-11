@@ -1,6 +1,7 @@
 ccxt
 openai
 pandas
+numpy
 schedule
 python-dotenv
 requests

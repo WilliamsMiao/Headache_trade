@@ -533,6 +533,30 @@
             background: #f8d7da;
             color: #721c24;
         }
+        
+        .risk-low {
+            background: #d4edda;
+            color: #155724;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        
+        .risk-medium {
+            background: #fff3cd;
+            color: #856404;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        
+        .risk-high {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
 
         .position-details {
             display: grid;
@@ -1497,6 +1521,12 @@
                                 <span class="detail-label">止盈:</span>
                                 <span class="detail-value">$${signal.take_profit}</span>
                             </div>
+                            ${signal.risk_assessment ? `
+                            <div class="detail-item">
+                                <span class="detail-label">风险评估:</span>
+                                <span class="detail-value ${signal.risk_assessment === '低风险' ? 'risk-low' : signal.risk_assessment === '中风险' ? 'risk-medium' : 'risk-high'}">${signal.risk_assessment}</span>
+                            </div>
+                            ` : ''}
                             <div class="detail-item">
                                 <span class="detail-label">时间:</span>
                                 <span class="detail-value">${signal.timestamp}</span>
@@ -1545,6 +1575,18 @@
                                 <span class="detail-label">趋势:</span>
                                 <span class="detail-value">${trend.overall}</span>
                             </div>
+                            ${trend.trend_strength && trend.trend_strength !== 'N/A' ? `
+                            <div class="detail-item">
+                                <span class="detail-label">趋势强度:</span>
+                                <span class="detail-value ${trend.trend_strength === '强' ? 'side-long' : ''}">${trend.trend_strength}</span>
+                            </div>
+                            ` : ''}
+                            ${trend.price_level && trend.price_level !== 'N/A' ? `
+                            <div class="detail-item">
+                                <span class="detail-label">价格位置:</span>
+                                <span class="detail-value">${trend.price_level}</span>
+                            </div>
+                            ` : ''}
                             <div class="detail-item">
                                 <span class="detail-label">更新时间:</span>
                                 <span class="detail-value">${analysis.timestamp}</span>

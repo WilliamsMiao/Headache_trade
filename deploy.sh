@@ -27,9 +27,9 @@ fi
 
 echo "✓ Python3 版本: $(python3 --version)"
 
-# 删除旧的虚拟环境
+# 清理旧的虚拟环境和缓存
 echo ""
-echo "🧹 清理旧的虚拟环境..."
+echo "🧹 清理旧的虚拟环境和缓存..."
 if [ -d "myenv" ]; then
     echo "   删除 myenv 目录..."
     rm -rf myenv
@@ -40,7 +40,12 @@ if [ -d "venv" ]; then
     rm -rf venv
 fi
 
-echo "✓ 旧虚拟环境已清理"
+# 清理Python缓存
+echo "   清理Python缓存..."
+find . -type d -name "__pycache__" -not -path "./venv/*" -exec rm -rf {} + 2>/dev/null || true
+find . -name "*.pyc" -not -path "./venv/*" -delete 2>/dev/null || true
+
+echo "✓ 旧虚拟环境和缓存已清理"
 
 # 创建新的虚拟环境
 echo ""
@@ -65,11 +70,10 @@ pip install --upgrade pip -q
 
 # 安装依赖
 echo "   安装项目依赖..."
-pip install -r requirements.txt
-
-if [ $? -ne 0 ]; then
+if ! pip install -r requirements.txt; then
     echo "❌ 依赖安装失败"
     echo "   请检查 requirements.txt 文件"
+    echo "   尝试手动安装: pip install -r requirements.txt"
     exit 1
 fi
 
@@ -78,26 +82,49 @@ echo "✓ 依赖安装完成"
 # 创建必要的目录
 echo ""
 echo "📁 创建必要的目录..."
-mkdir -p data logs static/css static/js templates
+mkdir -p data logs static/css static/js templates scripts
 
-echo "✓ 目录创建完成"
+# 确保脚本有执行权限
+if [ -f "run.sh" ]; then
+    chmod +x run.sh
+fi
+if [ -f "restart_safe.sh" ]; then
+    chmod +x restart_safe.sh
+fi
+if [ -f "scripts/check_status.sh" ]; then
+    chmod +x scripts/check_status.sh
+fi
+
+echo "✓ 目录创建完成，脚本权限已设置"
 
 # 检查 .env 文件
 echo ""
 echo "🔐 检查环境配置文件..."
 if [ ! -f ".env" ]; then
     echo "⚠️  未找到 .env 配置文件"
+    
+    # 检查是否有 .env.example 模板
+    if [ -f ".env.example" ]; then
+        echo "   从模板创建 .env 文件..."
+        cp .env.example .env
+        echo "✓ 已从 .env.example 创建 .env 文件"
+        echo ""
+        echo "📋 请编辑配置文件并填写你的 API 密钥:"
+        echo "   nano .env"
     echo ""
-    echo "📋 请按以下步骤配置:"
-    echo "   1. 复制配置模板: cp .env.example .env"
-    echo "   2. 编辑配置文件: nano .env"
-    echo "   3. 填写你的 API 密钥:"
+        echo "   需要配置的密钥:"
     echo "      - DEEPSEEK_API_KEY (从 https://platform.deepseek.com/ 获取)"
     echo "      - OKX_API_KEY (从 https://www.okx.com/account/my-api 获取)"
     echo "      - OKX_SECRET"
     echo "      - OKX_PASSWORD"
+        echo "      - CRYPTORACLE_API_KEY (可选)"
     echo ""
     echo "💡 配置完成后，运行 ./run.sh 启动系统"
+    else
+        echo "❌ 未找到 .env.example 模板文件"
+        echo "   请手动创建 .env 文件并配置 API 密钥"
+        exit 1
+    fi
 else
     echo "✓ 找到 .env 配置文件"
     
@@ -115,30 +142,73 @@ echo ""
 echo "🔍 验证安装..."
 python -c "
 import sys
+missing_packages = []
 try:
-    import ccxt, openai, flask, pandas, schedule
-    print('✓ 所有依赖包导入成功')
-except ImportError as e:
-    print(f'❌ 依赖包导入失败: {e}')
+    import ccxt
+except ImportError:
+    missing_packages.append('ccxt')
+try:
+    import openai
+except ImportError:
+    missing_packages.append('openai')
+try:
+    import flask
+except ImportError:
+    missing_packages.append('flask')
+try:
+    import pandas
+except ImportError:
+    missing_packages.append('pandas')
+try:
+    import schedule
+except ImportError:
+    missing_packages.append('schedule')
+try:
+    import numpy
+except ImportError:
+    missing_packages.append('numpy')
+
+if missing_packages:
+    print('❌ 缺少依赖包: ' + ', '.join(missing_packages))
     sys.exit(1)
-"
+else:
+    print('✓ 所有依赖包导入成功')
+" 2>&1
 
 if [ $? -eq 0 ]; then
     echo ""
     echo "🎉 部署完成！"
     echo "========================================"
     echo ""
+    
+    # 检查是否需要配置API密钥
+    if [ -f ".env" ] && grep -q "DEEPSEEK_API_KEY=sk-" .env && grep -q "OKX_API_KEY=" .env && ! grep -q "your-.*-here" .env; then
+        echo "✅ 系统已就绪，可以启动！"
+        echo ""
+        echo "📋 启动系统:"
+        echo "   ./run.sh"
+    else
     echo "📋 下一步操作:"
     echo "   1. 配置 API 密钥: nano .env"
     echo "   2. 启动系统: ./run.sh"
+    fi
+    
     echo ""
     echo "🌐 启动后访问地址:"
     echo "   本地: http://localhost:5000"
-    echo "   外网: http://$(curl -s ifconfig.me 2>/dev/null || echo 'your-server-ip'):5000"
+    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "your-server-ip")
+    echo "   外网: http://${SERVER_IP}:5000"
     echo ""
     echo "📚 更多信息请查看 README.md"
+    echo ""
+    echo "🔧 管理命令:"
+    echo "   - 启动系统: ./run.sh"
+    echo "   - 安全重启: ./restart_safe.sh"
+    echo "   - 查看日志: tail -f logs/bot.log"
+    echo "   - 检查状态: ./scripts/check_status.sh"
 else
     echo "❌ 部署验证失败"
+    echo "   请检查错误信息并重新运行部署脚本"
     exit 1
 fi
 

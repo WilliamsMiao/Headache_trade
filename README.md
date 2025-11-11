@@ -1,6 +1,15 @@
 # Crypto DeepSeek - 智能交易系统
 
-基于 DeepSeek AI 的加密货币自动化交易系统，提供实时交易分析、策略执行和可视化仪表板。
+基于 DeepSeek AI 的加密货币自动化交易系统，采用"趋势为王，结构修边"的交易理念，提供实时交易分析、策略执行和可视化仪表板。
+
+## ✨ 核心特性
+
+- 🤖 **AI驱动交易决策** - 基于DeepSeek AI的智能市场分析
+- 📊 **趋势为王策略** - 量化趋势强度，动态调整仓位和风险
+- 🎯 **智能仓位管理** - 根据信心等级和趋势强度自动调整仓位大小
+- 🛡️ **动态风控系统** - 实时价格监控，自动止盈止损
+- 📈 **可视化仪表板** - 实时查看交易状态、收益曲线和交易记录
+- ⚡ **自动化执行** - 15分钟周期自动分析并执行交易
 
 ## 🚀 快速开始
 
@@ -50,22 +59,33 @@ nano .env
 
 ```
 crypto_deepseek/
-├── deploy.sh                     # 🆕 一键部署脚本
-├── run.sh                        # 🆕 一键启动脚本
+├── deploy.sh                     # 一键部署脚本
+├── run.sh                        # 一键启动脚本
+├── restart_safe.sh               # 安全重启脚本
 ├── .env.example                  # 环境变量配置模板
+├── .env                          # 实际配置文件（用户创建，不提交到Git）
+├── requirements.txt              # Python 依赖包
+├── README.md                     # 项目文档
 ├── trading_dashboard.py          # Web 仪表板
 ├── trading_bots/
-│   └── deepseek_trading_bot.py   # 主交易机器人
-├── templates/
+│   └── deepseek_Fluc_reduce_version.py  # 主交易机器人（趋势为王策略）
+├── templates/                    # HTML模板
 │   ├── login.html               # 登录配置页面
 │   └── arena.html              # Arena 交易界面
 ├── static/                      # 静态文件
+│   ├── css/                     # CSS样式文件
+│   └── js/                      # JavaScript文件
 ├── data/                        # 数据文件
+│   ├── chart_history.json       # 图表历史数据
+│   ├── dashboard_data.json      # 仪表板数据
+│   └── initial_balance.json    # 初始余额记录
 ├── logs/                        # 日志文件
-├── scripts/
+│   ├── bot.log                  # 交易机器人日志
+│   └── dashboard.log            # 仪表板日志
+├── scripts/                     # 工具脚本
 │   ├── check_status.sh          # 状态检查脚本
 │   └── test_dashboard.py        # 测试工具
-└── requirements.txt             # Python 依赖包
+└── venv/                        # Python虚拟环境
 ```
 
 ## 🔐 使用流程
@@ -97,13 +117,16 @@ tail -f logs/bot.log
 ### 进程管理
 ```bash
 # 停止交易机器人
-pkill -f deepseek_trading_bot.py
+pkill -f deepseek_Fluc_reduce_version.py
 
 # 停止仪表板
 pkill -f trading_dashboard.py
 
-# 重启系统
-pkill -f deepseek_trading_bot.py && ./run.sh
+# 重启系统（推荐使用安全重启脚本）
+./restart_safe.sh
+
+# 或手动重启
+pkill -f deepseek_Fluc_reduce_version.py && ./run.sh
 ```
 
 ## 📋 配置要求
@@ -113,8 +136,7 @@ pkill -f deepseek_trading_bot.py && ./run.sh
 - OKX API Key / Secret / Password（用于交易）
 
 ### 可选配置
-- CryptoOracle API Key（用于情绪分析）
-- 钱包地址（用于资金管理）
+- CryptoOracle API Key（用于情绪分析，增强交易信号）
 
 ## 🔒 安全说明
 
@@ -157,10 +179,24 @@ pkill -f deepseek_trading_bot.py && ./run.sh
 ## 📚 技术栈
 
 - **后端**: Python 3.8+, Flask
-- **AI**: DeepSeek API
+- **AI**: DeepSeek API（智能市场分析）
 - **交易**: OKX API (CCXT)
-- **数据**: Pandas, NumPy
+- **数据**: Pandas, NumPy（技术指标计算）
 - **前端**: HTML5, CSS3, JavaScript
+- **调度**: Schedule（定时任务）
+
+## 🎯 交易策略
+
+### 趋势为王理念
+- **趋势强度量化**: 通过多周期均线、MACD、RSI等技术指标量化趋势强度（0-10分）
+- **结构修边**: 结合价格结构、布林带位置等优化入场时机
+- **智能仓位**: 根据趋势强度和AI信心等级动态调整仓位（0.5x - 1.5x）
+- **动态风控**: 基于ATR（平均真实波幅）动态设置止盈止损，实时价格监控
+
+### 交易周期
+- **分析周期**: 15分钟K线
+- **数据范围**: 24小时历史数据（96根K线）
+- **执行频率**: 每15分钟自动分析并执行交易
 
 ## 🤝 贡献
 
