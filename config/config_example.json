@@ -1,0 +1,56 @@
+{
+    "exchange": "binance",
+    "api_key": "YOUR_API_KEY",
+    "api_secret": "YOUR_API_SECRET",
+    "symbol": "BTC/USDT:USDT",
+    "check_interval": 300,
+    "proxy": null,
+    
+    "ai": {
+        "enabled": true,
+        "deepseek_api_key": "YOUR_DEEPSEEK_API_KEY",
+        "ai_weight": 0.6,
+        "technical_weight": 0.4
+    },
+    
+    "risk_management": {
+        "max_position_per_strategy": 0.5,
+        "max_total_risk": 0.02,
+        "min_account_balance": 100
+    },
+    
+    "scheduler": {
+        "min_switch_interval_hours": 6,
+        "min_confidence_for_switch": 60,
+        "use_ai": true
+    },
+    
+    "strategies": {
+        "grid": {
+            "enabled": true,
+            "grid_count": 10,
+            "risk_per_grid": 0.003
+        },
+        "trend": {
+            "enabled": true,
+            "donchian_entry_period": 20,
+            "donchian_exit_period": 10,
+            "max_pyramid_adds": 3,
+            "pyramid_interval_atr": 0.5,
+            "risk_per_trade": 0.01,
+            "adx_threshold": 25
+        },
+        "mean_reversion": {
+            "enabled": false,
+            "rsi_oversold": 30,
+            "rsi_overbought": 70,
+            "bb_std": 2.0
+        }
+    },
+    
+    "logging": {
+        "log_level": "INFO",
+        "rotation": "30 days",
+        "retention": "90 days"
+    }
+}

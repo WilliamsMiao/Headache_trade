@@ -1,0 +1,180 @@
+{
+    "comment": "多策略交易系统完整配置示例 - v2.0",
+    
+    "exchange": {
+        "name": "binance",
+        "api_key": "your_binance_api_key_here",
+        "api_secret": "your_binance_api_secret_here",
+        "test_mode": true,
+        "comment": "test_mode=true 使用测试网，false 使用实盘"
+    },
+    
+    "trading": {
+        "symbol": "BTC/USDT",
+        "timeframe": "1h",
+        "initial_capital": 10000.0,
+        "max_position_size_pct": 0.5,
+        "comment": "交易对、时间周期和资金设置"
+    },
+    
+    "ai": {
+        "enabled": true,
+        "deepseek_api_key": "sk-your-deepseek-api-key",
+        "ai_weight": 0.6,
+        "technical_weight": 0.4,
+        "model": "deepseek-chat",
+        "temperature": 0.7,
+        "max_tokens": 1000,
+        "comment": "AI决策引擎配置，ai_weight + technical_weight = 1.0"
+    },
+    
+    "strategies": {
+        "enabled_strategies": [
+            "grid",
+            "trend",
+            "mean_reversion",
+            "breakout",
+            "momentum"
+        ],
+        "comment": "启用的策略列表，会自动根据市场状态选择"
+    },
+    
+    "grid_strategy": {
+        "enabled": true,
+        "grid_size": 0.02,
+        "num_levels": 5,
+        "position_size_pct": 0.1,
+        "comment": "网格策略：适用于震荡市场"
+    },
+    
+    "trend_strategy": {
+        "enabled": true,
+        "ema_short": 12,
+        "ema_long": 26,
+        "adx_threshold": 25,
+        "atr_multiplier": 2.0,
+        "pyramid_levels": 3,
+        "risk_per_trade": 0.01,
+        "comment": "趋势跟随：适用于单边行情"
+    },
+    
+    "mean_reversion_strategy": {
+        "enabled": true,
+        "rsi_period": 14,
+        "rsi_oversold": 30,
+        "rsi_overbought": 70,
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "volume_threshold": 0.8,
+        "adx_max": 25,
+        "max_hold_hours": 48,
+        "risk_per_trade": 0.008,
+        "comment": "均值回归：适用于超卖超买反弹"
+    },
+    
+    "breakout_strategy": {
+        "enabled": true,
+        "consolidation_period": 10,
+        "bb_squeeze_threshold": 0.2,
+        "volume_surge_multiplier": 2.0,
+        "pullback_tolerance": 0.015,
+        "max_hold_hours": 24,
+        "risk_per_trade": 0.015,
+        "comment": "突破策略：适用于盘整突破"
+    },
+    
+    "momentum_strategy": {
+        "enabled": true,
+        "consecutive_candles": 3,
+        "volume_surge_multiplier": 1.5,
+        "rsi_min": 60,
+        "rsi_max": 80,
+        "adx_threshold": 30,
+        "trailing_atr_multiplier": 1.5,
+        "max_hold_hours": 6,
+        "risk_per_trade": 0.02,
+        "comment": "动量策略：适用于强势趋势"
+    },
+    
+    "risk_management": {
+        "max_daily_loss_pct": 0.05,
+        "max_drawdown_pct": 0.2,
+        "max_consecutive_losses": 5,
+        "max_position_pct": 0.6,
+        "stop_trading_on_violation": true,
+        "comment": "风险控制：日亏5%、最大回撤20%、连续亏损5次"
+    },
+    
+    "backtest": {
+        "enabled": true,
+        "commission_rate": 0.001,
+        "slippage_rate": 0.0005,
+        "initial_capital": 10000.0,
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "export_results": true,
+        "output_dir": "backtest_results",
+        "comment": "回测配置：手续费0.1%、滑点0.05%"
+    },
+    
+    "monitoring": {
+        "enabled": true,
+        "max_history": 1000,
+        "print_dashboard_interval_minutes": 15,
+        "export_report_daily": true,
+        "export_report_time": "23:00",
+        "comment": "性能监控：保留最近1000条记录，每15分钟打印一次"
+    },
+    
+    "web_dashboard": {
+        "enabled": true,
+        "host": "0.0.0.0",
+        "port": 5000,
+        "refresh_interval_seconds": 5,
+        "comment": "Web Dashboard：http://localhost:5000"
+    },
+    
+    "dingding": {
+        "enabled": false,
+        "webhook_url": "https://oapi.dingtalk.com/robot/send?access_token=YOUR_ACCESS_TOKEN",
+        "secret": "SECxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "notifications": {
+            "trade_open": true,
+            "trade_close": true,
+            "strategy_switch": true,
+            "risk_warning": true,
+            "daily_summary": true,
+            "system_start": true,
+            "system_stop": true
+        },
+        "daily_summary_time": "23:00",
+        "at_all_on_critical": true,
+        "at_mobiles": [],
+        "comment": "钉钉通知：需要配置webhook_url和secret"
+    },
+    
+    "telegram": {
+        "enabled": false,
+        "bot_token": "YOUR_BOT_TOKEN",
+        "chat_id": "YOUR_CHAT_ID",
+        "comment": "Telegram通知（待开发）"
+    },
+    
+    "logging": {
+        "level": "INFO",
+        "file": "logs/trading_bot.log",
+        "rotation": "1 day",
+        "retention": "30 days",
+        "format": "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+        "comment": "日志配置：INFO级别、每天轮换、保留30天"
+    },
+    
+    "advanced": {
+        "use_multi_timeframe": false,
+        "timeframes": ["5m", "15m", "1h", "4h"],
+        "use_portfolio_allocation": false,
+        "portfolio_symbols": ["BTC/USDT", "ETH/USDT", "BNB/USDT"],
+        "rebalance_interval_hours": 24,
+        "comment": "高级功能（待开发）：多时间周期、多币种组合"
+    }
+}

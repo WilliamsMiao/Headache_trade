@@ -1,211 +1,404 @@
-# Crypto DeepSeek - 智能交易系统
+# 🤖 Headache Trade - 加密货币自动交易系统
 
-基于 DeepSeek AI 的加密货币自动化交易系统，采用"趋势为王，结构修边"的交易理念，提供实时交易分析、策略执行和可视化仪表板。
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## ✨ 核心特性
+> 多策略AI驱动的加密货币自动交易系统，支持网格、趋势、均值回归、突破、动量等5种策略
 
-- 🤖 **AI驱动交易决策** - 基于DeepSeek AI的智能市场分析
-- 📊 **趋势为王策略** - 量化趋势强度，动态调整仓位和风险
-- 🎯 **智能仓位管理** - 根据信心等级和趋势强度自动调整仓位大小
-- 🛡️ **动态风控系统** - 实时价格监控，自动止盈止损
-- 📈 **可视化仪表板** - 实时查看交易状态、收益曲线和交易记录
-- ⚡ **自动化执行** - 15分钟周期自动分析并执行交易
+## ✨ 主要特性
+
+- 🎯 **5种交易策略**：网格、趋势跟随、均值回归、突破、动量
+- 🤖 **AI集成**：DeepSeek AI策略顾问，智能市场分析
+- 📊 **完整回测系统**：历史数据回测，参数优化
+- 🛡️ **风险管理**：动态止损止盈，仓位控制
+- 📈 **实时监控**：Web仪表盘，性能监控面板
+- 🔔 **消息通知**：钉钉机器人推送交易信号
+- 🔧 **高度可配置**：JSON配置，策略组合灵活
+
+## 📋 目录
+
+- [快速开始](#-快速开始)
+- [项目结构](#-项目结构)
+- [策略说明](#-策略说明)
+- [回测结果](#-回测结果)
+- [使用指南](#-使用指南)
+- [API配置](#-api配置)
+- [文档](#-文档)
 
 ## 🚀 快速开始
 
-### 一键部署（首次使用）
+### 1. 安装依赖
+
 ```bash
-cd /root/crypto_deepseek
-./deploy.sh
+# 克隆项目
+git clone https://github.com/WilliamsMiao/Headache_trade.git
+cd Headache_trade
+
+# 安装Python依赖
+pip install -r requirements.txt
 ```
 
-### 一键启动
+### 2. 配置
+
 ```bash
-./run.sh
-```
-
-这将自动启动：
-- 🤖 交易机器人（后台运行）
-- 📊 Web仪表板（前台运行）
-
-### 访问界面
-- **本地**: http://localhost:5000
-- **外网**: http://your-server-ip:5000
-
-## ⚙️ 配置说明
-
-### 1. API 密钥配置
-```bash
-# 复制配置模板
-cp .env.example .env
+# 复制配置示例
+cp config/config_example.json config/config.json
 
 # 编辑配置文件
-nano .env
+# 填入交易所API密钥、DeepSeek API密钥等
 ```
 
-需要配置的 API 密钥：
-- `DEEPSEEK_API_KEY` - DeepSeek API密钥（从 https://platform.deepseek.com/ 获取）
-- `OKX_API_KEY` - OKX交易所API密钥
-- `OKX_SECRET` - OKX交易所密钥
-- `OKX_PASSWORD` - OKX交易所密码
-- `CRYPTORACLE_API_KEY` - CryptoOracle API（可选）
+### 3. 运行回测（推荐先测试）
 
-### 2. 系统要求
-- Python 3.8+
-- Linux 系统（推荐 Ubuntu 20.04+）
-- 网络连接（用于访问 API 和交易所）
+```bash
+# 查看可用策略
+python backtest/run.py --list
+
+# 运行单个策略回测（30天测试）
+python backtest/run.py --strategy momentum --days 30 --timeframe 1h
+
+# 运行完整回测（90天，15分钟）
+python backtest/run.py --strategy momentum --days 90 --timeframe 15m
+
+# 对比多个策略
+python backtest/run.py --compare momentum mean_reversion breakout --days 90
+
+# 对比所有策略
+python backtest/run.py --all --days 90
+```
+
+### 4. 启动交易（模拟模式）
+
+```bash
+# 测试模式（不实际下单）
+python trading_bots/multi_strategy_bot.py --test
+
+# 查看Web监控面板
+python trading_dashboard.py
+# 访问 http://localhost:5000
+```
+
+### 5. 实盘交易（⚠️ 谨慎）
+
+```bash
+# 小仓位实盘测试
+python trading_bots/multi_strategy_bot.py --live --max-capital 1000
+```
 
 ## 📁 项目结构
 
 ```
-crypto_deepseek/
-├── deploy.sh                     # 一键部署脚本
-├── run.sh                        # 一键启动脚本
-├── restart_safe.sh               # 安全重启脚本
-├── .env.example                  # 环境变量配置模板
-├── .env                          # 实际配置文件（用户创建，不提交到Git）
-├── requirements.txt              # Python 依赖包
-├── README.md                     # 项目文档
-├── trading_dashboard.py          # Web 仪表板
-├── trading_bots/
-│   └── deepseek_Fluc_reduce_version.py  # 主交易机器人（趋势为王策略）
-├── templates/                    # HTML模板
-│   ├── login.html               # 登录配置页面
-│   └── arena.html              # Arena 交易界面
-├── static/                      # 静态文件
-│   ├── css/                     # CSS样式文件
-│   └── js/                      # JavaScript文件
-├── data/                        # 数据文件
-│   ├── chart_history.json       # 图表历史数据
-│   ├── dashboard_data.json      # 仪表板数据
-│   └── initial_balance.json    # 初始余额记录
-├── logs/                        # 日志文件
-│   ├── bot.log                  # 交易机器人日志
-│   └── dashboard.log            # 仪表板日志
-├── scripts/                     # 工具脚本
-│   ├── check_status.sh          # 状态检查脚本
-│   └── test_dashboard.py        # 测试工具
-└── venv/                        # Python虚拟环境
+Headache_trade/
+├── trading_bots/          # 核心交易代码
+│   ├── strategies/        # 5种交易策略实现
+│   ├── data_manager.py    # 数据管理器（缓存、下载）
+│   ├── report_generator.py # 回测报告生成器
+│   ├── backtest_engine.py # 回测引擎
+│   ├── multi_strategy_bot.py  # 主交易程序
+│   └── ...
+├── backtest/              # 回测系统 ⭐ 新架构
+│   ├── backtest_system.py # 统一回测系统（核心）
+│   ├── run.py             # CLI入口
+│   ├── USAGE.md           # 使用指南
+│   └── ARCHITECTURE.md    # 架构文档
+├── tests/                 # 测试脚本
+├── config/                # 配置文件
+├── data/                  # 历史数据（自动缓存）
+├── backtest_results/      # 回测报告输出
+├── docs/                  # 完整文档
+└── scripts/               # 部署脚本
 ```
 
-## 🔐 使用流程
+> 详细结构说明：[PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)
 
-1. **部署系统**: 运行 `./deploy.sh` 完成环境配置
-2. **配置 API**: 编辑 `.env` 文件填写 API 密钥
-3. **启动系统**: 运行 `./run.sh` 启动服务
-4. **访问界面**: 浏览器打开 http://localhost:5000
-5. **配置交易**: 在登录页面填写 API 配置
-6. **开始交易**: 验证成功后进入 Arena 交易界面
+## 🎯 策略说明
 
-## 🛠️ 管理命令
+### 1. 网格交易策略 (Grid)
+- **适用市场**：震荡市
+- **原理**：设置价格区间，高抛低吸
+- **优势**：稳定盈利，风险可控
+- **参数**：网格数量、价格区间、每格利润
 
-### 基本操作
+### 2. 趋势跟随策略 (Trend Following)
+- **适用市场**：单边趋势
+- **原理**：顺势而为，追涨杀跌
+- **优势**：捕捉大行情
+- **参数**：均线周期、趋势判断阈值
+
+### 3. 均值回归策略 (Mean Reversion)
+- **适用市场**：震荡市、超买超卖
+- **原理**：价格偏离均值后回归
+- **优势**：高胜率（回测53-65%）
+- **参数**：RSI阈值、布林带参数
+- **⚠️ 注意**：下跌市中效果差
+
+### 4. 突破策略 (Breakout)
+- **适用市场**：盘整后突破
+- **原理**：识别盘整，捕捉突破
+- **优势**：大行情起点入场
+- **参数**：盘整周期、成交量阈值
+
+### 5. 动量策略 (Momentum) ⭐ **推荐**
+- **适用市场**：明确趋势
+- **原理**：连续同向K线，成交量确认
+- **优势**：回测表现最佳（-6.4%）
+- **参数**：连续K线数、ATR倍数
+- **✅ 特点**：趋势过滤，风控严格
+
+## 📊 回测结果
+
+### 最新回测系统 🆕
+
+本项目现已配备**生产级回测系统**，具有以下特点：
+
+✅ **低耦合架构**：数据、执行、报告三层分离  
+✅ **智能缓存**：历史数据自动缓存，无需重复下载  
+✅ **标准化报告**：统一的文本+JSON格式输出  
+✅ **评级系统**：A-F自动评级（基于5项指标）  
+✅ **多策略对比**：一键对比所有策略表现  
+✅ **参数优化**：内置网格搜索框架  
+
+> 详细使用方法：[backtest/USAGE.md](./backtest/USAGE.md)  
+> 架构说明：[backtest/ARCHITECTURE.md](./backtest/ARCHITECTURE.md)
+
+### 90天回测（2025-08-20 至 2025-11-18）
+
+| 策略 | 收益率 | 交易次数 | 胜率 | 盈亏比 | 最大回撤 |
+|------|--------|----------|------|--------|----------|
+| **动量策略（优化）** | **-6.4%** | 113 | 31% | 0.64 | - |
+| 均值回归（优化） | -18.2% | 323 | 54% | 0.57 | - |
+| 原始均值回归 | -17.1% | 436 | 65% | 0.86 | - |
+| 原始动量策略 | -19.2% | 415 | 37% | 0.99 | - |
+
+**市场环境**：BTC从$126K跌至$90K（-28%强烈下跌）
+
+### 关键发现
+
+✅ **优化有效**：
+- 动量策略通过趋势过滤，亏损从-19.2%降至**-6.4%**（改善67%）
+- 交易频率降低73%（415→113次），提高信号质量
+
+⚠️ **市场影响**：
+- 所有策略在下跌市中均亏损（BTC -28%）
+- 均值回归策略在震荡市效果更好
+- 建议等待市场企稳或上升趋势
+
+💡 **回测系统使用**：
 ```bash
-# 部署系统（首次使用）
-./deploy.sh
+# 快速测试单个策略
+python backtest/run.py --strategy momentum --days 30 --timeframe 1h
 
-# 启动系统
-./run.sh
+# 完整回测
+python backtest/run.py --strategy momentum --days 90 --timeframe 15m
 
-# 查看交易机器人日志
-tail -f logs/bot.log
-
-# 检查系统状态
-./scripts/check_status.sh
+# 对比所有策略
+python backtest/run.py --all --days 90
 ```
 
-### 进程管理
+### 最佳参数配置
+
+**动量策略（推荐）**：
+```json
+{
+  "atr_multiplier": 2.0,
+  "risk_reward_ratio": 2.0,
+  "position_size": 0.3,
+  "trend_filter": true
+}
+```
+
+## 📖 使用指南
+
+### 回测系统（推荐先使用）
+
 ```bash
-# 停止交易机器人
-pkill -f deepseek_Fluc_reduce_version.py
+# 1. 查看所有可用策略
+python backtest/run.py --list
 
-# 停止仪表板
-pkill -f trading_dashboard.py
+# 2. 快速测试（30天，1小时周期）
+python backtest/run.py --strategy momentum --days 30 --timeframe 1h
 
-# 重启系统（推荐使用安全重启脚本）
-./restart_safe.sh
+# 3. 标准回测（90天，15分钟周期）
+python backtest/run.py --strategy momentum --days 90 --timeframe 15m
 
-# 或手动重启
-pkill -f deepseek_Fluc_reduce_version.py && ./run.sh
+# 4. 对比多个策略
+python backtest/run.py --compare momentum mean_reversion breakout
+
+# 5. 参数优化（Python API）
+python
+>>> from backtest.backtest_system import BacktestSystem
+>>> system = BacktestSystem()
+>>> best = system.optimize_parameters(
+...     strategy_key='momentum',
+...     param_grid={
+...         'atr_multiplier': [1.5, 2.0, 2.5],
+...         'risk_reward': [1.5, 2.0, 2.5]
+...     },
+...     days=90
+... )
 ```
 
-## 📋 配置要求
+回测报告自动保存到 `backtest_results/` 目录。
 
-### 必需配置
-- DeepSeek API Key（用于 AI 分析）
-- OKX API Key / Secret / Password（用于交易）
+### 配置文件示例
 
-### 可选配置
-- CryptoOracle API Key（用于情绪分析，增强交易信号）
+`config/config.json`:
+```json
+{
+  "exchange": {
+    "name": "binance",
+    "api_key": "YOUR_API_KEY",
+    "api_secret": "YOUR_API_SECRET",
+    "test_mode": true
+  },
+  "trading": {
+    "symbol": "BTC/USDT",
+    "timeframe": "15m",
+    "initial_capital": 10000
+  },
+  "strategies": {
+    "momentum": {
+      "enabled": true,
+      "position_size": 0.3,
+      "atr_multiplier": 2.0,
+      "risk_reward": 2.0
+    }
+  }
+}
+```
 
-## 🔒 安全说明
+### 运行监控面板
 
-⚠️ **重要提醒：**
-- `.env` 文件包含敏感信息，**绝不会**被上传到 Git
-- 所有 API 密钥从环境变量读取
-- 建议为 API 密钥设置 IP 白名单
-- 定期更换 API 密钥
-- 不要在公共场合泄露密钥
+```bash
+# 启动Web仪表盘
+python trading_dashboard.py
 
-## 🐛 故障排除
+# 访问面板
+# http://localhost:5000
+```
 
-### 常见问题
+### 钉钉机器人通知
 
-1. **部署失败**
-   ```bash
-   # 检查 Python 版本
-   python3 --version
-   
-   # 手动安装依赖
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
+```json
+{
+  "dingding": {
+    "enabled": true,
+    "webhook": "YOUR_WEBHOOK_URL",
+    "secret": "YOUR_SECRET"
+  }
+}
+```
 
-2. **启动失败**
-   ```bash
-   # 检查配置文件
-   cat .env
-   
-   # 查看错误日志
-   tail -f logs/bot.log
-   ```
+## 🔑 API配置
 
-3. **API 连接失败**
-   - 检查网络连接
-   - 验证 API 密钥是否正确
-   - 确认 API 权限设置
+### 1. 交易所API（Binance）
 
-## 📚 技术栈
+1. 访问 [Binance API管理](https://www.binance.com/zh-CN/my/settings/api-management)
+2. 创建新API密钥
+3. **⚠️ 权限设置**：
+   - ✅ 读取信息
+   - ✅ 现货交易（测试时禁用）
+   - ❌ 提币权限（永远不开启）
+4. 复制API Key和Secret到配置文件
 
-- **后端**: Python 3.8+, Flask
-- **AI**: DeepSeek API（智能市场分析）
-- **交易**: OKX API (CCXT)
-- **数据**: Pandas, NumPy（技术指标计算）
-- **前端**: HTML5, CSS3, JavaScript
-- **调度**: Schedule（定时任务）
+### 2. DeepSeek API（可选）
 
-## 🎯 交易策略
+1. 访问 [DeepSeek平台](https://platform.deepseek.com/)
+2. 注册并获取API密钥
+3. 配置到 `config/config.json`:
+```json
+{
+  "ai": {
+    "enabled": true,
+    "provider": "deepseek",
+    "api_key": "YOUR_DEEPSEEK_API_KEY"
+  }
+}
+```
 
-### 趋势为王理念
-- **趋势强度量化**: 通过多周期均线、MACD、RSI等技术指标量化趋势强度（0-10分）
-- **结构修边**: 结合价格结构、布林带位置等优化入场时机
-- **智能仓位**: 根据趋势强度和AI信心等级动态调整仓位（0.5x - 1.5x）
-- **动态风控**: 基于ATR（平均真实波幅）动态设置止盈止损，实时价格监控
+## 📚 文档
 
-### 交易周期
-- **分析周期**: 15分钟K线
-- **数据范围**: 24小时历史数据（96根K线）
-- **执行频率**: 每15分钟自动分析并执行交易
+### 快速入门
+- [项目结构说明](./PROJECT_STRUCTURE.md) - 完整的目录结构和文件说明
+- [快速开始指南](./docs/QUICK_START.md) - 详细的入门教程
+- [快速参考](./docs/QUICK_REFERENCE.md) - 常用命令和配置
+
+### 回测系统 🆕
+- **[回测使用指南](./backtest/USAGE.md)** - 回测系统完整使用说明
+- **[回测架构文档](./backtest/ARCHITECTURE.md)** - 系统架构和扩展指南
+- 特点：低耦合、智能缓存、标准化报告、参数优化
+
+### 技术文档
+- [系统架构](./docs/ARCHITECTURE.md) - 系统设计和架构说明
+- [多策略设计](./docs/MULTI_STRATEGY_DESIGN.md) - 策略设计思路
+- [AI集成指南](./docs/AI_INTEGRATION_GUIDE.md) - AI功能使用说明
+- [新功能指南](./docs/NEW_FEATURES_GUIDE.md) - 最新功能说明
+
+### 项目管理
+- [更新日志](./docs/CHANGELOG.md) - 版本更新记录
+- [项目总结](./docs/PROJECT_SUMMARY.md) - 项目完成情况
+- [优化总结](./docs/OPTIMIZATION_SUMMARY.md) - 回测优化结果
+
+## ⚠️ 风险提示
+
+1. **加密货币交易风险极高**，本项目不保证盈利
+2. **回测结果不代表未来表现**，过去的表现不能预测未来
+3. **建议先用模拟盘测试**，确认策略有效后再小仓位实盘
+4. **永远不要投入超过承受范围的资金**
+5. **市场下跌时所有策略都可能亏损**，注意风控
+
+## 🛡️ 安全建议
+
+1. ✅ **使用API白名单**：限制API只能从特定IP访问
+2. ✅ **禁用提币权限**：API只需要交易权限
+3. ✅ **设置止损**：配置最大亏损限制
+4. ✅ **小仓位开始**：初期使用总资金的10-20%
+5. ✅ **定期检查**：每天查看交易记录和持仓
 
 ## 🤝 贡献
 
-欢迎提交 Issue 和 Pull Request！
+欢迎提交Issue和Pull Request！
 
-## 📄 License
+## 📄 许可证
 
-MIT License
+MIT License - 详见 [LICENSE](./LICENSE)
+
+## 📞 联系方式
+
+- **GitHub**: [@WilliamsMiao](https://github.com/WilliamsMiao)
+- **项目主页**: [Headache_trade](https://github.com/WilliamsMiao/Headache_trade)
 
 ---
 
-🎉 **享受智能交易系统！** 📈🚀
+**⚡ 快速测试**:
+```bash
+# 运行快速开始脚本
+python tests/QUICK_START.py
+
+# 运行完整功能测试
+python tests/test_all_features.py
+```
+
+**📊 开始回测** ⭐ 推荐:
+```bash
+# 查看可用策略
+python backtest/run.py --list
+
+# 快速测试（30天）
+python backtest/run.py --strategy momentum --days 30 --timeframe 1h
+
+# 完整回测（90天）
+python backtest/run.py --strategy momentum --days 90 --timeframe 15m
+
+# 对比所有策略
+python backtest/run.py --all --days 90
+```
+
+**🚀 启动交易**（测试模式）:
+```bash
+python trading_bots/multi_strategy_bot.py --test
+```
+
+---
+
+⭐ 如果觉得项目有用，请给个Star支持一下！
