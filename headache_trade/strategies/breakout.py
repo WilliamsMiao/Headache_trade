@@ -146,7 +146,7 @@ class BreakoutStrategy(BaseStrategy):
         if len(close) < self.consolidation_period:
             return False
         
-        print(f"   📦 识别到盘整: 区间{indicators['consolidation_range']*100:.2f}%, BB宽度百分位{indicators['bb_width_percentile']:.1f}%")
+        print(f"   [BACKUP] 识别到盘整: 区间{indicators['consolidation_range']*100:.2f}%, BB宽度百分位{indicators['bb_width_percentile']:.1f}%")
         
         # 记录盘整区间
         self.consolidation_range = {
@@ -183,7 +183,7 @@ class BreakoutStrategy(BaseStrategy):
         if current_price < indicators['bb_upper'] * 0.98:
             return False
         
-        print(f"   🚀 向上突破: {breakout_price:.2f} → {current_price:.2f} (+{breakout_strength*100:.2f}%)")
+        print(f"   [START] 向上突破: {breakout_price:.2f} → {current_price:.2f} (+{breakout_strength*100:.2f}%)")
         print(f"   📊 成交量: {indicators['volume_ratio']:.2f}x")
         
         return True
@@ -333,12 +333,12 @@ class BreakoutStrategy(BaseStrategy):
             if position_side == 'long':
                 # 回落到盘整区间内
                 if current_price < self.consolidation_range['high'] * (1 - self.pullback_tolerance):
-                    print(f"   ⚠️ 假突破，回落到区间内")
+                    print(f"   [WARN] 假突破，回落到区间内")
                     return True
             else:
                 # 反弹到盘整区间内
                 if current_price > self.consolidation_range['low'] * (1 + self.pullback_tolerance):
-                    print(f"   ⚠️ 假突破，反弹到区间内")
+                    print(f"   [WARN] 假突破，反弹到区间内")
                     return True
         
         # 2. 时间止损

@@ -82,15 +82,15 @@ def test_strategy(strategy, strategy_name: str, price_data: pd.DataFrame):
     try:
         # 激活策略
         strategy.activate()
-        print(f"✓ 策略已激活")
+        print(f"[PASS] 策略已激活")
         
         # 生成信号
         signal = strategy.generate_signal(price_data, current_position=None)
         
         if signal is None:
-            print(f"✓ 信号生成成功 (无信号)")
+            print(f"[PASS] 信号生成成功 (无信号)")
         else:
-            print(f"✓ 信号生成成功:")
+            print(f"[PASS] 信号生成成功:")
             print(f"  - 信号类型: {signal.signal_type.value}")
             print(f"  - 置信度: {signal.confidence:.2f}%")
             print(f"  - 入场价格: ${signal.entry_price:.2f}")
@@ -107,7 +107,7 @@ def test_strategy(strategy, strategy_name: str, price_data: pd.DataFrame):
                 account_balance=10000.0,
                 signal=signal
             )
-            print(f"✓ 仓位计算成功: {position_size:.4f}")
+            print(f"[PASS] 仓位计算成功: {position_size:.4f}")
         
         # 测试退出条件
         should_exit = strategy.should_exit(
@@ -115,19 +115,19 @@ def test_strategy(strategy, strategy_name: str, price_data: pd.DataFrame):
             entry_price=price_data['close'].iloc[-10],
             position_side='long'
         )
-        print(f"✓ 退出条件检查成功: {should_exit}")
+        print(f"[PASS] 退出条件检查成功: {should_exit}")
         
         # 测试性能摘要
         summary = strategy.get_performance_summary()
-        print(f"✓ 性能摘要获取成功:")
+        print(f"[PASS] 性能摘要获取成功:")
         print(f"  - 总交易数: {summary['total_trades']}")
         print(f"  - 胜率: {summary['win_rate']:.2f}%")
         
-        print(f"\n✅ {strategy_name} 测试通过!")
+        print(f"\n[OK] {strategy_name} 测试通过!")
         return True
         
     except Exception as e:
-        print(f"\n❌ {strategy_name} 测试失败!")
+        print(f"\n[FAIL] {strategy_name} 测试失败!")
         print(f"错误: {str(e)}")
         import traceback
         traceback.print_exc()
@@ -143,7 +143,7 @@ def main():
     # 生成测试数据
     print("\n生成测试数据...")
     price_data = generate_sample_data(rows=200, price_start=50000.0)
-    print(f"✓ 生成了 {len(price_data)} 行测试数据")
+    print(f"[PASS] 生成了 {len(price_data)} 行测试数据")
     print(f"  价格范围: ${price_data['close'].min():.2f} - ${price_data['close'].max():.2f}")
     
     # 定义所有策略
@@ -170,16 +170,16 @@ def main():
     total = len(results)
     
     for name, result in results:
-        status = "✅ 通过" if result else "❌ 失败"
+        status = "[OK] 通过" if result else "[FAIL] 失败"
         print(f"{status} - {name}")
     
     print(f"\n总计: {passed}/{total} 个策略测试通过")
     
     if passed == total:
-        print("\n🎉 所有策略测试通过!")
+        print("\n[SUCCESS] 所有策略测试通过!")
         return 0
     else:
-        print(f"\n⚠️ 有 {total - passed} 个策略测试失败")
+        print(f"\n[WARN] 有 {total - passed} 个策略测试失败")
         return 1
 
 

@@ -89,7 +89,7 @@ class TradingLogger:
             encoding="utf-8",
         )
         
-        logger.info("📝 日志系统已初始化")
+        logger.info("[LOG] 日志系统已初始化")
     
     @staticmethod
     def get_logger():
@@ -148,10 +148,10 @@ class TradingLogger:
             position: 持仓字典
         """
         if not position:
-            logger.info("📦 POSITION | 无持仓")
+            logger.info("[BACKUP] POSITION | 无持仓")
             return
         
-        msg = (f"📦 POSITION | {position['symbol']} | {position['side']} | "
+        msg = (f"[BACKUP] POSITION | {position['symbol']} | {position['side']} | "
                f"Size: {position['size']} | Entry: {position['entry_price']} | "
                f"PnL: {position.get('unrealized_pnl', 0):.2f} USDT")
         
@@ -187,7 +187,7 @@ class TradingLogger:
             duration: 耗时（秒）
             **kwargs: 其他参数
         """
-        status = "✅" if success else "❌"
+        status = "[OK]" if success else "[FAIL]"
         msg = f"{status} API | {api_name}"
         
         if duration:

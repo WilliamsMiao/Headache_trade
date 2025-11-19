@@ -40,7 +40,7 @@ class MultiStrategyBot:
                     for key, value in loaded_config.items():
                         self.config_manager.config[key] = value
             except Exception as e:
-                print(f"⚠️ 无法加载配置文件 {config_path}: {e}")
+                print(f"[WARN] 无法加载配置文件 {config_path}: {e}")
         
         self.config = self.config_manager.config
         
@@ -220,7 +220,7 @@ class MultiStrategyBot:
             if signal.take_profit:
                 self._set_take_profit(signal.take_profit, position_size, side)
             
-            print(f"\n✅ 交易执行成功:")
+            print(f"\n[OK] 交易执行成功:")
             print(f"   策略: {self.active_strategy_name}")
             print(f"   方向: {side.upper()}")
             print(f"   价格: {current_price:.2f}")
@@ -297,7 +297,7 @@ class MultiStrategyBot:
             self.active_strategy.update_performance(trade_result)
             
             self.log.info(f"平仓完成: PnL = {trade_result['pnl']:.2f} USDT")
-            print(f"\n📊 平仓: {'✅ 盈利' if trade_result['is_win'] else '❌ 亏损'} {abs(trade_result['pnl']):.2f} USDT")
+            print(f"\n📊 平仓: {'[OK] 盈利' if trade_result['is_win'] else '[FAIL] 亏损'} {abs(trade_result['pnl']):.2f} USDT")
             
             self.current_position = None
             
@@ -320,12 +320,12 @@ class MultiStrategyBot:
             print(f"💰 账户余额: {self.account_balance:.2f} USDT")
             
             if self.current_position:
-                print(f"📦 当前持仓: {self.current_position['side'].upper()}")
+                print(f"[BACKUP] 当前持仓: {self.current_position['side'].upper()}")
                 print(f"   入场价: {self.current_position['entry_price']:.2f}")
                 print(f"   数量: {self.current_position['size']:.4f}")
                 print(f"   浮盈: {self.current_position['unrealized_pnl']:.2f} USDT")
             else:
-                print(f"📦 当前持仓: 无")
+                print(f"[BACKUP] 当前持仓: 无")
             
             # 检查退出条件
             self.check_exit_conditions(price_data)
@@ -353,7 +353,7 @@ class MultiStrategyBot:
         self.log.info("交易机器人启动")
         
         print("\n" + "="*60)
-        print("🚀 多策略自适应交易机器人启动")
+        print("[START] 多策略自适应交易机器人启动")
         print(f"📈 交易对: {self.symbol}")
         print(f"⏱️ 检查间隔: {self.check_interval}秒")
         print("="*60 + "\n")

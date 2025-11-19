@@ -1,0 +1,419 @@
+﻿python : test_adx_calculation (__main__.TestIndicators.test_adx_calculation)
+所在位置 行:1 字符: 214
++ ... stem.Text.Encoding]::UTF8; python tests\run_all_tests.py 2>&1 | Out-F ...
++                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (test_adx_calcul...dx_calculation):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+����ADX���� ... ERROR
+test_atr_calculation (__main__.TestIndicators.test_atr_calculation)
+����ATR���� ... ERROR
+test_bollinger_bands_calculation (__main__.TestIndicators.test_bollinger_bands_calculation)
+���Բ��ִ����� ... ERROR
+test_ema_calculation (__main__.TestIndicators.test_ema_calculation)
+����EMA���� ... ERROR
+test_macd_calculation (__main__.TestIndicators.test_macd_calculation)
+����MACD���� ... ERROR
+test_rsi_calculation (__main__.TestIndicators.test_rsi_calculation)
+����RSI���� ... ERROR
+test_sma_calculation (__main__.TestIndicators.test_sma_calculation)
+����SMA���� ... ERROR
+test_volume_ratio_calculation (__main__.TestIndicators.test_volume_ratio_calculation)
+���Գɽ������ʼ��� ... ERROR
+test_data_file_exists (__main__.TestDataIntegrity.test_data_file_exists)
+���������ļ��Ƿ���� ... ERROR
+test_no_missing_values (__main__.TestDataIntegrity.test_no_missing_values)
+���Թؼ����Ƿ���ȱʧֵ ... ERROR
+test_price_validity (__main__.TestDataIntegrity.test_price_validity)
+���Լ۸�������Ч�� ... ERROR
+test_required_columns (__main__.TestDataIntegrity.test_required_columns)
+���Ա������Ƿ���� ... ERROR
+test_position_size_calculation (__main__.TestRiskManagement.test_position_size_calculation)
+���Բ�λ��С���� ... ERROR
+test_risk_limits (__main__.TestRiskManagement.test_risk_limits)
+���Է������� ... ERROR
+
+======================================================================
+ERROR: test_adx_calculation (__main__.TestIndicators.test_adx_calculation)
+����ADX����
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 73, in test_adx_calculation
+    adx = calculate_adx(self.data, period=14)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: calculate_adx() missing 2 required positional arguments: 'low' and 'close'
+
+======================================================================
+ERROR: test_atr_calculation (__main__.TestIndicators.test_atr_calculation)
+����ATR����
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 60, in test_atr_calculation
+    atr = calculate_atr(self.data, period=14)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: calculate_atr() missing 2 required positional arguments: 'low' and 'close'
+
+======================================================================
+ERROR: test_bollinger_bands_calculation (__main__.TestIndicators.test_bollinger_bands_calculation)
+���Բ��ִ�����
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+489, in _apply_columnwise
+    arr = self._prep_values(arr)
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+361, in _prep_values
+    raise NotImplementedError(
+NotImplementedError: ops for Rolling for this dtype datetime64[ns] are not implemented
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 101, in 
+test_bollinger_bands_calculation
+    upper, middle, lower = calculate_bollinger_bands(self.data)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\headache_trade\core\indicators.py", line 122, in 
+calculate_bollinger_bands
+    middle = close.rolling(window=period).mean()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+2259, in mean
+    return super().mean(
+           ^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+1625, in mean
+    return self._apply(window_func, name="mean", numeric_only=numeric_only)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+619, in _apply
+    return self._apply_columnwise(homogeneous_func, name, numeric_only)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+491, in _apply_columnwise
+    raise DataError(
+pandas.errors.DataError: Cannot aggregate non-numeric type: datetime64[ns]
+
+======================================================================
+ERROR: test_ema_calculation (__main__.TestIndicators.test_ema_calculation)
+����EMA����
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+489, in _apply_columnwise
+    arr = self._prep_values(arr)
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+361, in _prep_values
+    raise NotImplementedError(
+NotImplementedError: ops for ExponentialMovingWindow for this dtype datetime64[ns] are not implemented
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 117, in test_ema_calculation
+    ema = calculate_ema(self.data, period=20)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\headache_trade\core\indicators.py", line 141, in calculate_ema
+    return close.ewm(span=period, adjust=False).mean()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\ewm.py", line 565, in 
+mean
+    return self._apply(window_func, name="mean", numeric_only=numeric_only)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+619, in _apply
+    return self._apply_columnwise(homogeneous_func, name, numeric_only)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+491, in _apply_columnwise
+    raise DataError(
+pandas.errors.DataError: Cannot aggregate non-numeric type: datetime64[ns]
+
+======================================================================
+ERROR: test_macd_calculation (__main__.TestIndicators.test_macd_calculation)
+����MACD����
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+489, in _apply_columnwise
+    arr = self._prep_values(arr)
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+361, in _prep_values
+    raise NotImplementedError(
+NotImplementedError: ops for ExponentialMovingWindow for this dtype datetime64[ns] are not implemented
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 83, in test_macd_calculation
+    macd, signal, hist = calculate_macd(self.data)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\headache_trade\core\indicators.py", line 101, in calculate_macd
+    ema_fast = close.ewm(span=fast, adjust=False).mean()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\ewm.py", line 565, in 
+mean
+    return self._apply(window_func, name="mean", numeric_only=numeric_only)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+619, in _apply
+    return self._apply_columnwise(homogeneous_func, name, numeric_only)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+491, in _apply_columnwise
+    raise DataError(
+pandas.errors.DataError: Cannot aggregate non-numeric type: datetime64[ns]
+
+======================================================================
+ERROR: test_rsi_calculation (__main__.TestIndicators.test_rsi_calculation)
+����RSI����
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\arrays\datetimelike.py", 
+line 1006, in _cmp_method
+    other = self._validate_comparison_value(other)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\arrays\datetimelike.py", 
+line 565, in _validate_comparison_value
+    raise InvalidComparison(other)
+pandas.errors.InvalidComparison: 0
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 45, in test_rsi_calculation
+    rsi = calculate_rsi(self.data, period=14)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\headache_trade\core\indicators.py", line 28, in calculate_rsi
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+                        ^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\ops\common.py", line 76, in 
+new_method
+    return method(self, other)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\arraylike.py", line 56, in 
+__gt__
+    return self._cmp_method(other, operator.gt)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\frame.py", line 7922, in 
+_cmp_method
+    new_data = self._dispatch_frame_op(other, op, axis=axis)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\frame.py", line 7967, in 
+_dispatch_frame_op
+    bm = self._mgr.apply(array_op, right=right)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\internals\managers.py", line 
+361, in apply
+    applied = b.apply(f, **kwargs)
+              ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\internals\blocks.py", line 
+395, in apply
+    result = func(self.values, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\ops\array_ops.py", line 330, 
+in comparison_op
+    res_values = op(lvalues, rvalues)
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\ops\common.py", line 76, in 
+new_method
+    return method(self, other)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\arraylike.py", line 56, in 
+__gt__
+    return self._cmp_method(other, operator.gt)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\arrays\datetimelike.py", 
+line 1008, in _cmp_method
+    return invalid_comparison(self, other, op)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\ops\invalid.py", line 40, in 
+invalid_comparison
+    raise TypeError(f"Invalid comparison between dtype={left.dtype} and {typ}")
+TypeError: Invalid comparison between dtype=timedelta64[ns] and int
+
+======================================================================
+ERROR: test_sma_calculation (__main__.TestIndicators.test_sma_calculation)
+����SMA����
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+489, in _apply_columnwise
+    arr = self._prep_values(arr)
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+361, in _prep_values
+    raise NotImplementedError(
+NotImplementedError: ops for Rolling for this dtype datetime64[ns] are not implemented
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 128, in test_sma_calculation
+    sma = calculate_sma(self.data, period=20)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\headache_trade\core\indicators.py", line 155, in calculate_sma
+    return close.rolling(window=period).mean()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+2259, in mean
+    return super().mean(
+           ^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+1625, in mean
+    return self._apply(window_func, name="mean", numeric_only=numeric_only)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+619, in _apply
+    return self._apply_columnwise(homogeneous_func, name, numeric_only)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+491, in _apply_columnwise
+    raise DataError(
+pandas.errors.DataError: Cannot aggregate non-numeric type: datetime64[ns]
+
+======================================================================
+ERROR: test_volume_ratio_calculation (__main__.TestIndicators.test_volume_ratio_calculation)
+���Գɽ������ʼ���
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+489, in _apply_columnwise
+    arr = self._prep_values(arr)
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+361, in _prep_values
+    raise NotImplementedError(
+NotImplementedError: ops for Rolling for this dtype datetime64[ns] are not implemented
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 138, in test_volume_ratio_calculation
+    vol_ratio = calculate_volume_ratio(self.data, period=20)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\headache_trade\core\indicators.py", line 169, in calculate_volume_ratio
+    volume_ma = volume.rolling(window=period).mean()
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+2259, in mean
+    return super().mean(
+           ^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+1625, in mean
+    return self._apply(window_func, name="mean", numeric_only=numeric_only)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+619, in _apply
+    return self._apply_columnwise(homogeneous_func, name, numeric_only)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\window\rolling.py", line 
+491, in _apply_columnwise
+    raise DataError(
+======================================================================
+Headache Trade �����׼�
+======================================================================
+��ʼʱ��: 2025-11-19 14:10:18
+======================================================================
+
+======================================================================
+����: ��Ԫ����
+�ű�: tests/test_core_modules.py
+======================================================================
+
+======================================================================
+����ģ�鵥Ԫ����
+======================================================================
+
+
+======================================================================
+
+pandas.errors.DataError: Cannot aggregate non-numeric type: datetime64[ns]
+
+======================================================================
+ERROR: test_data_file_exists (__main__.TestDataIntegrity.test_data_file_exists)
+���������ļ��Ƿ����
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 165, in test_data_file_exists
+    print(f"\u2705 �����ļ�����ͨ��: {len(self.data)}��")
+UnicodeEncodeError: 'gbk' codec can't encode character '\u2705' in position 0: illegal multibyte sequence
+
+======================================================================
+ERROR: test_no_missing_values (__main__.TestDataIntegrity.test_no_missing_values)
+���Թؼ����Ƿ���ȱʧֵ
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 188, in test_no_missing_values
+    print("\u2705 ���������Բ���ͨ��: ��ȱʧֵ")
+UnicodeEncodeError: 'gbk' codec can't encode character '\u2705' in position 0: illegal multibyte sequence
+
+======================================================================
+ERROR: test_price_validity (__main__.TestDataIntegrity.test_price_validity)
+���Լ۸�������Ч��
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 206, in test_price_validity
+    print("\u2705 �۸���Ч�Բ���ͨ��")
+UnicodeEncodeError: 'gbk' codec can't encode character '\u2705' in position 0: illegal multibyte sequence
+
+======================================================================
+ERROR: test_required_columns (__main__.TestDataIntegrity.test_required_columns)
+���Ա������Ƿ����
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 176, in test_required_columns
+    print(f"\u2705 �����в���ͨ��: {list(self.data.columns)}")
+UnicodeEncodeError: 'gbk' codec can't encode character '\u2705' in position 0: illegal multibyte sequence
+
+======================================================================
+ERROR: test_position_size_calculation (__main__.TestRiskManagement.test_position_size_calculation)
+���Բ�λ��С����
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 217, in test_position_size_calculation
+    strategy.activate()
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\headache_trade\strategies\base.py", line 115, in activate
+    print(f"\u2705 �����Ѽ���: {self.name}")
+UnicodeEncodeError: 'gbk' codec can't encode character '\u2705' in position 0: illegal multibyte sequence
+
+======================================================================
+ERROR: test_risk_limits (__main__.TestRiskManagement.test_risk_limits)
+���Է�������
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 241, in test_risk_limits
+    strategy = BaseStrategy()
+               ^^^^^^^^^^^^^^
+TypeError: Can't instantiate abstract class BaseStrategy with abstract methods calculate_position_size, generate_signal, 
+should_exit
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.081s
+
+FAILED (errors=14)
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\test_core_modules.py", line 281, in <module>
+    print("\u274c ���ֲ���ʧ��")
+UnicodeEncodeError: 'gbk' codec can't encode character '\u274c' in position 0: illegal multibyte sequence
+
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\run_all_tests.py", line 54, in run_test_script
+    print(f"\n\u274c {name} ʧ�� (������: {result.returncode})")
+UnicodeEncodeError: 'gbk' codec can't encode character '\u274c' in position 2: illegal multibyte sequence
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\run_all_tests.py", line 124, in <module>
+    exit(main())
+         ^^^^^^
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\run_all_tests.py", line 80, in main
+    result = run_test_script(name, script_path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cair1\Desktop\HT\Headache_trade\tests\run_all_tests.py", line 61, in run_test_script
+    print(f"\n\u274c {name} ִ���쳣: {e}")
+UnicodeEncodeError: 'gbk' codec can't encode character '\u274c' in position 2: illegal multibyte sequence

@@ -1,0 +1,104 @@
+# Headache Trade 配置文件
+# 从JSON配置自动迁移生成
+
+exchange:
+  name: binance
+  api_key: YOUR_API_KEY
+  api_secret: YOUR_API_SECRET
+  testnet: false
+  timeout: 10
+  enable_rate_limit: true
+  proxy: null
+trading:
+  symbol: BTC/USDT:USDT
+  check_interval: 300
+ai:
+  enabled: true
+  provider: deepseek
+  api_key: YOUR_DEEPSEEK_API_KEY
+  api_base_url: https://api.deepseek.com
+  model: deepseek-chat
+  timeout: 30
+  max_retries: 3
+  ai_weight: 0.6
+  technical_weight: 0.4
+risk_management:
+  base_risk_pct: 0.01
+  max_risk_pct: 0.02
+  max_position_per_strategy: 0.5
+  max_total_risk: 0.02
+  min_account_balance: 100
+  min_risk_reward_ratio: 1.5
+  trailing_stop_activation: 0.5
+  trailing_stop_distance: 0.3
+scheduler:
+  min_switch_interval_hours: 6
+  min_confidence_for_switch: 60
+  use_ai: true
+  enable_auto_switch: true
+strategies:
+  grid:
+    enabled: true
+    grid_count: 10
+    grid_spacing_pct: 0.01
+    risk_per_grid: 0.003
+    price_range_pct: 0.1
+  trend_following:
+    enabled: true
+    donchian_entry_period: 20
+    donchian_exit_period: 10
+    ema_fast: 12
+    ema_slow: 26
+    adx_period: 14
+    adx_threshold: 25
+    max_pyramid_adds: 3
+    pyramid_interval_atr: 0.5
+    risk_per_trade: 0.01
+  mean_reversion:
+    enabled: false
+    rsi_oversold: 30
+    rsi_overbought: 70
+    bb_period: 20
+    bb_std: 2.0
+    atr_period: 14
+logging:
+  level: INFO
+  console_level: INFO
+  file_level: DEBUG
+  log_dir: logs
+  rotation: 30 days
+  retention: 90 days
+  format: '{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}'
+  backtrace: true
+  diagnose: true
+notifications:
+  enabled: false
+  dingding:
+    enabled: false
+    webhook_url: ${DINGDING_WEBHOOK:}
+    secret: ${DINGDING_SECRET:}
+  telegram:
+    enabled: false
+    bot_token: ${TELEGRAM_BOT_TOKEN:}
+    chat_id: ${TELEGRAM_CHAT_ID:}
+database:
+  enabled: false
+  type: sqlite
+  path: data/trading.db
+web:
+  enabled: true
+  host: 0.0.0.0
+  port: 8050
+  debug: false
+  auth_required: false
+backtest:
+  initial_capital: 10000
+  commission_rate: 0.001
+  slippage_rate: 0.0005
+  enable_margin: true
+  enable_short: true
+development:
+  debug_mode: false
+  mock_exchange: false
+  save_signals: true
+  save_trades: true

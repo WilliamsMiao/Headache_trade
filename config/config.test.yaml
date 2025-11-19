@@ -1,0 +1,47 @@
+# 测试环境配置
+# 继承自 config.yaml，仅覆盖测试相关的配置
+
+# 交易所配置
+exchange:
+  testnet: true
+  enable_rate_limit: false
+
+# 交易配置
+trading:
+  symbol: BTC/USDT:USDT
+  check_interval: 60         # 更短的检查间隔用于测试
+  max_position_pct: 0.3      # 测试时降低仓位
+
+# AI配置
+ai:
+  enabled: false              # 测试时禁用AI以加快速度
+  timeout: 10
+
+# 风险管理
+risk_management:
+  base_risk_pct: 0.005       # 降低风险
+  max_risk_pct: 0.01
+  min_account_balance: 10    # 降低最低余额
+
+# 性能配置
+performance:
+  enable_cache: false         # 测试时禁用缓存
+  use_async_api: false
+
+# 日志配置
+logging:
+  level: DEBUG
+  console_level: DEBUG
+  retention: "7 days"
+
+# Web界面
+web:
+  enabled: false              # 测试时不启动web界面
+  debug: true
+
+# 开发配置
+development:
+  debug_mode: true
+  mock_exchange: true         # 使用模拟交易所
+  save_signals: true
+  save_trades: true

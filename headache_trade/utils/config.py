@@ -42,12 +42,12 @@ class ConfigManager:
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     self.config = json.load(f)
                 self.last_modified = self.config_file.stat().st_mtime
-                print(f"✅ 配置已加载: {self.config_file}")
+                print(f"[OK] 配置已加载: {self.config_file}")
             else:
                 # 创建默认配置
                 self._create_default_config()
         except Exception as e:
-            print(f"❌ 加载配置失败: {e}")
+            print(f"[FAIL] 加载配置失败: {e}")
             self._create_default_config()
     
     def _create_default_config(self):
@@ -106,9 +106,9 @@ class ConfigManager:
             self.config_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=4, ensure_ascii=False)
-            print(f"✅ 配置已保存: {self.config_file}")
+            print(f"[OK] 配置已保存: {self.config_file}")
         except Exception as e:
-            print(f"❌ 保存配置失败: {e}")
+            print(f"[FAIL] 保存配置失败: {e}")
     
     def reload_if_changed(self):
         """检查并重新加载配置（如果文件已修改）"""
@@ -130,7 +130,7 @@ class ConfigManager:
                     return True
         
         except Exception as e:
-            print(f"❌ 检查配置文件失败: {e}")
+            print(f"[FAIL] 检查配置文件失败: {e}")
         
         return False
     

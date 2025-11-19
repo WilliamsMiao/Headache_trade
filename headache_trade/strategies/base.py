@@ -112,7 +112,7 @@ class BaseStrategy(ABC):
     def activate(self):
         """激活策略"""
         self.is_active = True
-        print(f"✅ 策略已激活: {self.name}")
+        print(f"[OK] 策略已激活: {self.name}")
     
     def deactivate(self):
         """停用策略"""

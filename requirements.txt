@@ -4,6 +4,7 @@ pandas
 numpy
 schedule
 python-dotenv
+pyyaml
 requests
 urllib3
 flask
