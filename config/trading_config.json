@@ -1,0 +1,44 @@
+{
+    "trading": {
+        "symbol": "BTC/USDT:USDT",
+        "max_position_pct": 0.8,
+        "min_position_pct": 0.1,
+        "default_leverage": 2,
+        "min_confidence": 60
+    },
+    "risk_management": {
+        "base_risk_pct": 0.01,
+        "max_risk_pct": 0.02,
+        "min_risk_reward_ratio": 1.5,
+        "trailing_stop_activation": 0.5,
+        "trailing_stop_distance": 0.3
+    },
+    "indicators": {
+        "atr_period": 14,
+        "rsi_period": 14,
+        "macd_fast": 12,
+        "macd_slow": 26,
+        "macd_signal": 9,
+        "bb_period": 20,
+        "bb_std": 2
+    },
+    "api": {
+        "deepseek_timeout": 30,
+        "exchange_timeout": 10,
+        "sentiment_api_timeout": 10,
+        "max_retries": 3
+    },
+    "performance": {
+        "enable_cache": true,
+        "cache_ttl": 60,
+        "use_async_api": false,
+        "dashboard_update_interval": 5
+    },
+    "logging": {
+        "level": "INFO",
+        "console_level": "INFO",
+        "file_level": "DEBUG",
+        "rotation": "00:00",
+        "retention": "30 days"
+    }
+}
