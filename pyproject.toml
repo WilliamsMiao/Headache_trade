@@ -1,0 +1,71 @@
+[project]
+name = "quant"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ccxt>=4.5.21",
+    "flask>=3.1.2",
+    "flask-cors>=6.0.1",
+    "numpy>=2.3.5",
+    "openai>=2.8.1",
+    "pandas>=2.3.3",
+    "python-dotenv>=1.2.1",
+    "requests>=2.32.5",
+    "schedule>=1.2.2",
+    "urllib3>=2.5.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-mock>=3.6.0",
+    "pytest-cov>=4.0.0",
+    "mypy>=1.8.0",
+    "types-requests>=2.31.0",
+    "types-Flask-Cors>=4.0.0",
+]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=services",
+    "--cov-report=term-missing",
+]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "integration: marks tests as integration tests (requires real API credentials)",
+]
+
+[tool.mypy]
+# Strict mode for better type safety
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+
+# Error codes
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+
+# Import discovery
+namespace_packages = true
+explicit_package_bases = true
+
+# Per-module configuration
+[[tool.mypy.overrides]]
+module = [
+    "ccxt",
+    "ccxt.*",
+]
+ignore_missing_imports = true
