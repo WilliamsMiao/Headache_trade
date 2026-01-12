@@ -38,6 +38,18 @@ exchange = ccxt.okx({
 # 开仓+平仓总成本：0.1% (0.001) - 假设都是Taker订单
 TRADING_FEE_RATE = 0.001  # 0.1% 总手续费率（开仓+平仓）
 
+# 锁定止损机制配置
+LOCK_STOP_LOSS_PROFIT_THRESHOLD = 0.8  # 🔧 优化v2：从1.5%降至0.8%，更早激活盈利保护
+LOCK_STOP_LOSS_BUFFER = 0.1  # 盈亏平衡点缓冲（%）
+LOCK_STOP_LOSS_RATIO = 0.3  # 基础锁定比例（已废弃，使用下面的分段配置）
+
+# 🔧 优化v2：分段锁定比例配置
+LOCK_STOP_LOSS_RATIOS = {
+    'low': {'min_profit': 0.008, 'max_profit': 0.015, 'ratio': 0.4},    # 0.8%-1.5%盈利：锁定40%
+    'medium': {'min_profit': 0.015, 'max_profit': 0.025, 'ratio': 0.5},  # 1.5%-2.5%盈利：锁定50%
+    'high': {'min_profit': 0.025, 'max_profit': float('inf'), 'ratio': 0.6}  # >2.5%盈利：锁定60%
+}
+
 # =============================================================================
 # 智能移动止盈止损系统配置
 # =============================================================================
@@ -45,27 +57,37 @@ TRADING_FEE_RATE = 0.001  # 0.1% 总手续费率（开仓+平仓）
 # 三阶段保护级别配置
 PROTECTION_LEVELS = {
     'defensive': {    # 防守阶段：开仓初期
-        'stop_loss_multiplier': 1.5,    # 紧止损
-        'take_profit_multiplier': 0.8,  # 保守止盈
+        'stop_loss_multiplier': 2.0,    # 🔧 优化v2：从1.5提高到2.0，给予更大呼吸空间
+        'take_profit_multiplier': 2.5,  # 🔧 优化v2：从2.0提高到2.5，扩大止盈目标
         'activation_time': 30,           # 30秒后进入平衡阶段
         'min_profit_required': 0.0      # 无盈利要求
     },
     'balanced': {     # 平衡阶段：有盈利后
-        'stop_loss_multiplier': 1.2,    # 中等止损
-        'take_profit_multiplier': 1.0,  # 标准止盈
+        'stop_loss_multiplier': 1.5,    # 保持1.5，与defensive一致
+        'take_profit_multiplier': 2.5,  # 🔧 关键修复：从1.0提高到2.5，扩大止盈目标（约1.5%）
         'activation_time': 0,            # 立即激活（基于盈利条件）
-        'min_profit_required': 0.1      # 需要0.1%盈利
+        'min_profit_required': 0.2      # 🔧 关键修复：从0.5%降低到0.2%，更容易进入balanced阶段
     },
     'aggressive': {   # 进攻阶段：大幅盈利后
         'stop_loss_multiplier': 0.8,    # 宽松止损，让利润奔跑
-        'take_profit_multiplier': 1.5,  # 扩大止盈目标
+        'take_profit_multiplier': 1.5,  # 保持1.5，让利润继续奔跑
         'activation_time': 0,            # 立即激活（基于盈利条件）
-        'min_profit_required': 0.5      # 需要0.5%盈利
+        'min_profit_required': 0.5      # 🔧 关键修复：从1.0%降低到0.5%，更容易进入aggressive阶段
     }
 }
 
 # 轨道更新间隔（秒）
-ORBIT_UPDATE_INTERVAL = 30  # 每30秒更新一次保护轨道
+ORBIT_UPDATE_INTERVAL = 120  # 🔧 优化v2：从60秒提高到120秒，进一步减少订单操作
+ORBIT_INITIAL_PROTECTION_TIME = 300  # 🔧 新增：开仓后前5分钟（300秒）不更新轨道
+ORBIT_MIN_TRIGGER_TIME = 180  # 🔧 新增：开仓后前3分钟（180秒）禁止保护轨道触发平仓
+
+# 🔧 优化v2：订单更新阈值配置
+ORDER_UPDATE_THRESHOLD = 0.005  # 止盈止损价格变化超过0.5%才更新订单
+ORDER_UPDATE_MIN_CHANGE = 0.002  # 最小价格变化0.2%，避免频繁微调
+
+# 持仓验证保护期配置
+POSITION_VERIFY_PROTECTION_SECONDS = 60  # 开仓后60秒内跳过持仓验证，避免数据同步延迟误判
+POSITION_VERIFY_FAIL_THRESHOLD = 3  # 连续验证失败3次才清空持仓信息
 
 # 优化的交易参数配置 - 基于"趋势为王，结构修边"理念
 TRADE_CONFIG = {
@@ -131,6 +153,9 @@ performance_tracker = {
     'daily_pnl': 0,
     'weekly_pnl': 0,
     'trade_count': 0,
+    'last_trade_time': None,  # 🔧 新增：记录上次交易时间
+    'daily_trade_count': 0,  # 🔧 新增：每日交易次数
+    'last_trade_date': None,  # 🔧 新增：上次交易日期
     'win_count': 0,  # 盈利交易数量
     'loss_count': 0,  # 亏损交易数量
     'win_rate': 0,
@@ -232,6 +257,7 @@ class ProtectionOrbit:
     def _determine_protection_level(self, time_elapsed, profit_pct):
         """
         根据持仓时间和盈利水平确定保护级别
+        🔧 优化：降低切换门槛，更容易进入balanced和aggressive阶段
         
         Returns:
             str: 'defensive', 'balanced', 或 'aggressive'
@@ -240,11 +266,12 @@ class ProtectionOrbit:
         if time_elapsed < PROTECTION_LEVELS['defensive']['activation_time'] or profit_pct < 0:
             return 'defensive'
         
-        # 进攻阶段：大幅盈利（0.5%以上）
+        # 进攻阶段：大幅盈利（0.5%以上，从1.0%降低）
         if profit_pct >= PROTECTION_LEVELS['aggressive']['min_profit_required']:
             return 'aggressive'
         
-        # 平衡阶段：有盈利但未达到进攻阶段（0.1%-0.5%）
+        # 🔧 优化：平衡阶段门槛从0.5%降低到0.2%，更容易进入
+        # 平衡阶段：有盈利但未达到进攻阶段（0.2%-0.5%）
         if profit_pct >= PROTECTION_LEVELS['balanced']['min_profit_required']:
             return 'balanced'
         
@@ -326,25 +353,25 @@ class DynamicTakeProfit:
         else:
             base_profit = 0
         
-        # 根据盈利阶段调整止盈策略
+        # 🔧 优化：根据盈利阶段调整止盈策略，确保止盈目标覆盖手续费+利润
         if base_profit < 0.001:  # 微利阶段（<0.1%）
-            # 保守止盈：入场价 + 0.5倍ATR
+            # 🔧 优化：从0.5倍ATR提高到1.0倍ATR，确保覆盖手续费
             if current_price > entry_price:  # 多头
-                take_profit = entry_price + (atr * 0.5)
+                take_profit = entry_price + (atr * 1.0)
             else:  # 空头
-                take_profit = entry_price - (atr * 0.5)
+                take_profit = entry_price - (atr * 1.0)
         elif base_profit < 0.005:  # 中等盈利（0.1%-0.5%）
-            # 跟随止盈：当前价 + 0.8倍ATR
+            # 🔧 关键修复：从0.8倍ATR提高到1.5倍ATR，确保止盈目标足够大
             if current_price > entry_price:  # 多头
-                take_profit = current_price + (atr * 0.8)
+                take_profit = current_price + (atr * 1.5)
             else:  # 空头
-                take_profit = current_price - (atr * 0.8)
+                take_profit = current_price - (atr * 1.5)
         else:  # 高盈利阶段（>0.5%）
-            # 让利润奔跑：当前价 + 1.2倍ATR
+            # 🔧 优化：从1.2倍ATR提高到1.8倍ATR，让利润继续奔跑
             if current_price > entry_price:  # 多头
-                take_profit = current_price + (atr * 1.2)
+                take_profit = current_price + (atr * 1.8)
             else:  # 空头
-                take_profit = current_price - (atr * 1.2)
+                take_profit = current_price - (atr * 1.8)
         
         # 根据市场条件调整
         if market_condition == 'volatile':
@@ -496,7 +523,7 @@ class RealTimePriceMonitor:
         self.is_monitoring = False
         self.monitor_thread = None
         self.last_order_update_time = None  # 记录上次订单更新时间，用于频率控制
-        self.min_update_interval = ORBIT_UPDATE_INTERVAL  # 使用配置的轨道更新间隔（30秒）
+        self.min_update_interval = ORBIT_UPDATE_INTERVAL  # 使用配置的轨道更新间隔（60秒）
         self.last_orbit_update_time = None  # 记录上次轨道更新时间
         
         # 智能移动止盈止损系统组件
@@ -508,6 +535,7 @@ class RealTimePriceMonitor:
         # 持仓相关时间记录
         self.position_open_time = None  # 持仓开始时间
         self.atr_value = 0  # 当前ATR值
+        self.position_verify_fail_count = 0  # 持仓验证失败计数器
         
         # 当前持仓的风控参数
         self.current_position_info = {
@@ -521,6 +549,32 @@ class RealTimePriceMonitor:
             'highest_profit': 0,  # 用于移动止盈
             'lowest_profit': 0,    # 用于移动止损
             'tp_sl_order_ids': None  # 止盈止损订单ID {'tp_order_id': 'xxx', 'sl_order_id': 'xxx'}
+        }
+        
+        # 锁定止损配置 - 可根据市场状况调整
+        self.lock_stop_loss_config = {
+            'profit_threshold': LOCK_STOP_LOSS_PROFIT_THRESHOLD / 100,  # 激活锁定止损的盈利阈值 0.5%
+            'buffer_ratio': LOCK_STOP_LOSS_BUFFER / 100,  # 盈亏平衡点缓冲 0.1%
+            'lock_ratio': LOCK_STOP_LOSS_RATIO,  # 锁定比例 30%
+            'min_lock_distance': 0.002,  # 最小锁定距离 0.2%
+            'activated': False,
+            'locked_stop_price': 0,
+            'breakeven_price': 0,
+            'peak_profit_price': 0,  # 🔧 新增：记录历史最高盈利点价格
+            'high_volatility_multiplier': 1.2,  # 高波动性时提高阈值
+            'low_volatility_multiplier': 0.8,   # 低波动性时降低阈值
+        }
+        
+        # 盈利分批平仓配置
+        self.profit_taking_config = {
+            'partial_close_threshold_1': 0.02,  # 盈利2%平仓一半
+            'partial_close_threshold_2': 0.04,  # 盈利4%平仓全部
+            'partial_close_ratio_1': 0.5,       # 第一次平仓比例50%
+            'min_partial_close_size': 0.01,     # 最小平仓数量
+            'partial_close_1_executed': False,  # 第一次平仓是否已执行
+            'partial_close_2_executed': False,  # 第二次平仓是否已执行
+            'last_partial_close_time': None,    # 上次平仓时间
+            'min_close_interval': 10,           # 最小平仓间隔(秒)
         }
     
     def start_monitoring(self):
@@ -564,6 +618,7 @@ class RealTimePriceMonitor:
         # 🔧 记录持仓开始时间
         self.position_open_time = datetime.now()
         self.last_orbit_update_time = None  # 重置轨道更新时间
+        self.position_verify_fail_count = 0  # 🔧 重置持仓验证失败计数（开仓时重置）
         
         # 关键修复：先取消该交易对的所有策略订单（不依赖订单ID）
         # 这样可以确保清除所有旧订单，避免订单累积
@@ -608,8 +663,26 @@ class RealTimePriceMonitor:
             'lowest_profit': current_price if signal_data['signal'] == 'SELL' else float('inf'),
             'update_time': datetime.now(),
             'tp_sl_order_ids': order_ids,
-            'atr': atr  # 存储ATR值
+            'atr': atr,  # 存储ATR值
+            'trend_score': signal_data.get('trend_score', 0)  # 🔧 优化：保存趋势强度用于分批止盈
         }
+        
+        # 初始化锁定止损配置
+        if position_side == 'long':
+            self.lock_stop_loss_config['breakeven_price'] = current_price * (1 + TRADING_FEE_RATE)
+        else:  # short
+            self.lock_stop_loss_config['breakeven_price'] = current_price * (1 - TRADING_FEE_RATE)
+        self.lock_stop_loss_config['activated'] = False
+        self.lock_stop_loss_config['locked_stop_price'] = 0
+        self.lock_stop_loss_config['peak_profit_price'] = 0  # 🔧 重置历史最高盈利点
+        
+        # 🔧 重置盈利平仓状态
+        self.profit_taking_config.update({
+            'partial_close_1_executed': False,
+            'partial_close_2_executed': False,
+            'last_partial_close_time': None
+        })
+        print("🔄 盈利分批平仓状态已重置")
         
         print(f"📝 更新持仓监控:")
         print(f"   - 方向: {self.current_position_info['position_side']}")
@@ -624,6 +697,13 @@ class RealTimePriceMonitor:
     
     def clear_position_info(self):
         """清空持仓信息（平仓时调用）"""
+        # 🔧 新增：检查是否在开仓保护期内，保护期内不执行清仓（避免误判）
+        if self.position_open_time:
+            time_elapsed = (datetime.now() - self.position_open_time).total_seconds()
+            if time_elapsed < POSITION_VERIFY_PROTECTION_SECONDS:
+                print(f"⚠️ 保护期内（开仓后{time_elapsed:.1f}秒）检测到清仓请求，可能是数据同步延迟导致的误判，跳过清仓操作")
+                return
+        
         # 🔧 修复：强制取消所有策略订单，无论是否有订单ID（避免订单残留）
         try:
             print("🔄 平仓时强制取消该交易对的所有止盈止损订单...")
@@ -658,6 +738,22 @@ class RealTimePriceMonitor:
             'lowest_profit': 0,
             'tp_sl_order_ids': None
         }
+        
+        # 重置锁定止损配置
+        self.lock_stop_loss_config['activated'] = False
+        self.lock_stop_loss_config['locked_stop_price'] = 0
+        self.lock_stop_loss_config['breakeven_price'] = 0
+        self.lock_stop_loss_config['peak_profit_price'] = 0  # 🔧 重置历史最高盈利点
+        
+        # 🔧 重置盈利平仓状态
+        self.profit_taking_config.update({
+            'partial_close_1_executed': False,
+            'partial_close_2_executed': False,
+            'last_partial_close_time': None
+        })
+        
+        # 🔧 重置持仓验证失败计数
+        self.position_verify_fail_count = 0
     
     def initialize_existing_position(self, current_position, price_data):
         """初始化现有持仓的监控信息（启动时调用）
@@ -733,6 +829,20 @@ class RealTimePriceMonitor:
                 print(f"⚠️ 设置止盈止损订单时出错: {e}")
                 print(f"⚠️ 将使用代码监控作为备用机制")
             
+            # 🔧 修复：初始化保护轨道系统（现有持仓也需要）
+            atr = price_data.get('technical_data', {}).get('atr', current_price * 0.01)
+            self.atr_value = atr
+            try:
+                self.protection_orbit = ProtectionOrbit(
+                    entry_price=current_position['entry_price'],  # 使用实际入场价
+                    atr=atr,
+                    position_side=current_position['side']
+                )
+                print(f"✅ 保护轨道系统已初始化（现有持仓）")
+            except Exception as e:
+                print(f"⚠️ 初始化保护轨道系统失败: {e}")
+                self.protection_orbit = None
+            
             # 初始化监控信息
             leverage = current_position.get('leverage', self.trade_config.get('leverage', 1))
             self.current_position_info = {
@@ -749,6 +859,10 @@ class RealTimePriceMonitor:
                 'peak_profit': 0,
                 'tp_sl_order_ids': order_ids
             }
+            
+            # 🔧 修复：记录持仓开始时间（用于保护轨道系统）
+            self.position_open_time = datetime.now()
+            self.last_orbit_update_time = None  # 重置轨道更新时间
             
             # 计算当前盈亏，判断是否激活移动止盈
             # 获取杠杆信息
@@ -767,11 +881,21 @@ class RealTimePriceMonitor:
                 if current_price < self.current_position_info['lowest_profit']:
                     self.current_position_info['lowest_profit'] = current_price
             
-            # 如果盈利超过1%，激活移动止盈
-            if profit_pct > 1:
-                self.current_position_info['trailing_stop_activated'] = True
+            # 🔧 优化：根据趋势强度动态调整移动止盈激活条件
+            trend_score = self.current_position_info.get('trend_score', 0)
+            if trend_score >= 8:  # 极强趋势：0.5%就激活
+                trailing_activation = 0.5
+            elif trend_score >= 6:  # 强趋势：0.8%激活
+                trailing_activation = 0.8
+            else:  # 中等趋势：1%激活
+                trailing_activation = 1.0
+            
+            if profit_pct > trailing_activation:
+                if not self.current_position_info.get('trailing_stop_activated', False):
+                    self.current_position_info['trailing_stop_activated'] = True
+                    trend_desc = "极强趋势" if trend_score >= 8 else "强趋势" if trend_score >= 6 else "中等趋势"
+                    print(f"🎯 移动止盈已激活（盈利{profit_pct:.2f}% > {trailing_activation:.1f}%，{trend_desc}）")
                 self.current_position_info['peak_profit'] = profit_pct
-                print("🎯 移动止盈已激活（盈利超过1%）")
             
             print(f"✅ 现有持仓监控已初始化:")
             print(f"   - 入场价: {current_position['entry_price']:.2f}")
@@ -795,7 +919,7 @@ class RealTimePriceMonitor:
     
     def _update_protection_orbits(self, current_price, profit_pct):
         """
-        更新保护轨道（每30秒调用一次）
+        更新保护轨道（动态间隔调用）
         
         Args:
             current_price: 当前价格
@@ -810,6 +934,10 @@ class RealTimePriceMonitor:
                 time_elapsed = (datetime.now() - self.position_open_time).total_seconds()
             else:
                 time_elapsed = 0
+            
+            # 🔧 优化v2：开仓后前5分钟（300秒）不更新轨道
+            if time_elapsed < ORBIT_INITIAL_PROTECTION_TIME:
+                return
             
             # 获取市场波动性和趋势强度（简化版本，可以从price_data获取）
             volatility = 0.5  # 默认值，可以从技术指标获取
@@ -849,6 +977,12 @@ class RealTimePriceMonitor:
             return False
         
         try:
+            # 🔧 优化v2：开仓后前3分钟（180秒）禁止保护轨道触发平仓
+            if self.position_open_time:
+                time_elapsed = (datetime.now() - self.position_open_time).total_seconds()
+                if time_elapsed < ORBIT_MIN_TRIGGER_TIME:
+                    return False
+            
             orbits = self.protection_orbit.get_orbits()
             upper_orbit = orbits['upper_orbit']
             lower_orbit = orbits['lower_orbit']
@@ -857,16 +991,26 @@ class RealTimePriceMonitor:
             if position_side == 'long':
                 # 多头：检查止盈和止损
                 if current_price >= upper_orbit:
-                    print(f"🎯 止盈轨道触发: {current_price:.2f} >= {upper_orbit:.2f}")
-                    return True
+                    # 🔧 修复：检查扣除手续费后的实际盈亏
+                    actual_profit_pct = self._calculate_actual_profit_with_fees(current_price, profit_pct)
+                    if actual_profit_pct > 0:
+                        print(f"🎯 止盈轨道触发: {current_price:.2f} >= {upper_orbit:.2f}, 实际盈亏={actual_profit_pct:.2f}% (扣除手续费后)")
+                        return True
+                    else:
+                        print(f"⚠️ 止盈轨道已触发但扣除手续费后亏损: 浮盈={profit_pct:.2f}%, 实际={actual_profit_pct:.2f}%, 继续持仓")
                 if current_price <= lower_orbit:
                     print(f"🚨 止损轨道触发: {current_price:.2f} <= {lower_orbit:.2f}")
                     return True
             else:  # short
                 # 空头：检查止盈和止损
                 if current_price <= upper_orbit:
-                    print(f"🎯 止盈轨道触发: {current_price:.2f} <= {upper_orbit:.2f}")
-                    return True
+                    # 🔧 修复：检查扣除手续费后的实际盈亏
+                    actual_profit_pct = self._calculate_actual_profit_with_fees(current_price, profit_pct)
+                    if actual_profit_pct > 0:
+                        print(f"🎯 止盈轨道触发: {current_price:.2f} <= {upper_orbit:.2f}, 实际盈亏={actual_profit_pct:.2f}% (扣除手续费后)")
+                        return True
+                    else:
+                        print(f"⚠️ 止盈轨道已触发但扣除手续费后亏损: 浮盈={profit_pct:.2f}%, 实际={actual_profit_pct:.2f}%, 继续持仓")
                 if current_price >= lower_orbit:
                     print(f"🚨 止损轨道触发: {current_price:.2f} >= {lower_orbit:.2f}")
                     return True
@@ -881,7 +1025,7 @@ class RealTimePriceMonitor:
         """
         同步轨道到OKX交易所
         
-        每30秒更新一次保护轨道订单
+        每60秒更新一次保护轨道订单
         """
         if not self.protection_orbit:
             return
@@ -891,7 +1035,7 @@ class RealTimePriceMonitor:
         if self.last_order_update_time:
             time_since_last_update = (now - self.last_order_update_time).total_seconds()
             if time_since_last_update < self.min_update_interval:
-                return  # 距离上次更新不足30秒，跳过
+                return  # 距离上次更新不足60秒，跳过
         
         try:
             orbits = self.protection_orbit.get_orbits()
@@ -926,12 +1070,68 @@ class RealTimePriceMonitor:
         """监控主循环"""
         while self.is_monitoring:
             try:
+                # 🔧 修复：验证实际持仓状态，如果实际无持仓但内存中有信息，则清空内存信息，防止残留订单
+                # 🔧 新增：添加开仓保护期和重试机制，避免数据同步延迟误判
+                try:
+                    # 检查是否在开仓保护期内
+                    is_in_protection_period = False
+                    if self.position_open_time:
+                        time_elapsed = (datetime.now() - self.position_open_time).total_seconds()
+                        if time_elapsed < POSITION_VERIFY_PROTECTION_SECONDS:
+                            is_in_protection_period = True
+                    
+                    actual_position = get_current_position()
+                    if not actual_position or actual_position['size'] <= 0:
+                        # 实际无持仓，但内存中可能有残留信息
+                        if self.current_position_info['position_side'] or self.current_position_info['position_size'] > 0:
+                            if is_in_protection_period:
+                                # 保护期内：只记录警告，不执行清仓，重置失败计数
+                                time_elapsed = (datetime.now() - self.position_open_time).total_seconds()
+                                print(f"⚠️ 保护期内检测到实际无持仓但内存中有持仓信息（开仓后{time_elapsed:.1f}秒），可能是数据同步延迟，跳过验证")
+                                self.position_verify_fail_count = 0  # 重置失败计数
+                            else:
+                                # 保护期外：增加失败计数，连续失败3次才清仓
+                                self.position_verify_fail_count += 1
+                                print(f"⚠️ 检测到实际无持仓但内存中有持仓信息（失败次数: {self.position_verify_fail_count}/{POSITION_VERIFY_FAIL_THRESHOLD}）")
+                                
+                                if self.position_verify_fail_count >= POSITION_VERIFY_FAIL_THRESHOLD:
+                                    print(f"⚠️ 连续{self.position_verify_fail_count}次验证失败，清空内存信息，避免残留订单")
+                                    self.clear_position_info()
+                                    self.position_verify_fail_count = 0  # 重置计数
+                        else:
+                            # 内存中也没有持仓信息，重置失败计数
+                            self.position_verify_fail_count = 0
+                        time.sleep(self.monitor_interval)
+                        continue
+                    else:
+                        # 验证成功，重置失败计数
+                        if self.position_verify_fail_count > 0:
+                            print(f"✅ 持仓验证成功，重置失败计数（之前失败{self.position_verify_fail_count}次）")
+                        self.position_verify_fail_count = 0
+                    
+                    # 验证持仓方向是否匹配（保护期外才执行严格验证）
+                    if not is_in_protection_period and self.current_position_info['position_side']:
+                        if actual_position['side'] != self.current_position_info['position_side']:
+                            print(f"⚠️ 检测到持仓方向不匹配（实际: {actual_position['side']}, 内存: {self.current_position_info['position_side']}），清空内存信息")
+                            self.clear_position_info()
+                            self.position_verify_fail_count = 0  # 重置计数
+                            time.sleep(self.monitor_interval)
+                            continue
+                except Exception as e:
+                    print(f"⚠️ 验证实际持仓时出错: {e}")
+                    # 验证失败时继续执行，但记录错误
+                    # 不在保护期内时才增加失败计数
+                    if self.position_open_time:
+                        time_elapsed = (datetime.now() - self.position_open_time).total_seconds()
+                        if time_elapsed >= POSITION_VERIFY_PROTECTION_SECONDS:
+                            self.position_verify_fail_count += 1
+                
                 # 只有有持仓时才监控
                 if self.current_position_info['position_side'] and self.current_position_info['position_size'] > 0:
                     # 检查价格条件（包含轨道触发检查）
                     self._check_price_conditions()
                     
-                    # 每30秒更新一次保护轨道
+                    # 每60秒更新一次保护轨道
                     now = datetime.now()
                     if not self.last_orbit_update_time or (now - self.last_orbit_update_time).total_seconds() >= ORBIT_UPDATE_INTERVAL:
                         # 获取当前价格和盈亏用于更新轨道
@@ -1008,22 +1208,62 @@ class RealTimePriceMonitor:
                 else:  # short
                     unrealized_pnl = (position['entry_price'] - current_price) * position['position_size'] * self.trade_config.get('contract_size', 0.01)
             
+            # 计算实际盈利（扣除手续费）
+            actual_profit_pct = self._calculate_actual_profit_with_fees(current_price, profit_pct)
+            
             # 详细的监控日志输出（包含杠杆信息用于调试）
-            print(f"🔍 价格监控: {current_price:.2f} | 盈亏: {profit_pct:+.2f}% (价格变化: {price_change_pct:+.2f}% × 杠杆: {leverage}x) | 浮动: {unrealized_pnl:+.2f} USDT")
+            print(f"🔍 价格监控: {current_price:.2f} | 盈亏: {profit_pct:+.2f}% (实际: {actual_profit_pct:+.2f}%) | 浮动: {unrealized_pnl:+.2f} USDT")
             print(f"   📌 入场价: {position['entry_price']:.2f}")
             print(f"   🛑 止损价: {position['stop_loss']:.2f} | 距离: {abs(current_price - position['stop_loss']):.2f}")
             print(f"   🎯 止盈价: {position['take_profit']:.2f} | 距离: {abs(current_price - position['take_profit']):.2f}")
             
-            # 移动止盈信息
-            if position['trailing_stop_activated']:
-                if position['position_side'] == 'long':
-                    trailing_stop = position['highest_profit'] * 0.995
-                    print(f"   📈 移动止盈: 最高价 {position['highest_profit']:.2f} | 触发价 {trailing_stop:.2f} | 回撤窗口: 0.5%")
-                else:  # short
-                    trailing_stop = position['lowest_profit'] * 1.005
-                    print(f"   📉 移动止盈: 最低价 {position['lowest_profit']:.2f} | 触发价 {trailing_stop:.2f} | 回撤窗口: 0.5%")
+            # 锁定止损详细信息
+            if self.lock_stop_loss_config['activated']:
+                lock_status = "🔒 已激活"
+                if self.lock_stop_loss_config['locked_stop_price'] > 0:
+                    lock_status += f" | 锁定价: {self.lock_stop_loss_config['locked_stop_price']:.2f}"
             else:
-                print(f"   ⏸️  移动止盈: 未激活 (需盈利>1%，当前: {profit_pct:.2f}%)")
+                threshold = self.lock_stop_loss_config['profit_threshold'] * 100
+                lock_status = f"⏸️ 未激活 (需盈利≥{threshold:.1f}%，当前: {actual_profit_pct:.2f}%)"
+            
+            print(f"   {lock_status}")
+            if self.lock_stop_loss_config['breakeven_price'] > 0:
+                print(f"   💰 盈亏平衡: {self.lock_stop_loss_config['breakeven_price']:.2f}")
+            if self.lock_stop_loss_config['peak_profit_price'] > 0:
+                peak_label = "历史最高价" if position['position_side'] == 'long' else "历史最低价"
+                print(f"   📊 {peak_label}: {self.lock_stop_loss_config['peak_profit_price']:.2f}")
+            
+            # 盈利平仓状态
+            profit_config = self.profit_taking_config
+            if profit_config['partial_close_2_executed']:
+                profit_status = "✅ 已全部平仓(4%)"
+            elif profit_config['partial_close_1_executed']:
+                profit_status = f"🟡 已平仓一半(2%) | 等待4% ({actual_profit_pct:.2f}%)"
+            else:
+                threshold_1 = profit_config['partial_close_threshold_1'] * 100
+                threshold_2 = profit_config['partial_close_threshold_2'] * 100
+                profit_status = f"⏳ 等待盈利: {threshold_1:.0f}%/{threshold_2:.0f}% (当前: {actual_profit_pct:.2f}%)"
+            
+            print(f"   💰 盈利平仓: {profit_status}")
+            
+            # 🔧 优化：移动止盈信息（根据趋势强度显示动态回撤窗口）
+            if position['trailing_stop_activated']:
+                trailing_window = position.get('trailing_window', 0.005)  # 默认0.5%
+                if position['position_side'] == 'long':
+                    trailing_stop = position['highest_profit'] * (1 - trailing_window)
+                    print(f"   📈 移动止盈: 最高价 {position['highest_profit']:.2f} | 触发价 {trailing_stop:.2f} | 回撤窗口: {trailing_window*100:.1f}%")
+                else:  # short
+                    trailing_stop = position['lowest_profit'] * (1 + trailing_window)
+                    print(f"   📉 移动止盈: 最低价 {position['lowest_profit']:.2f} | 触发价 {trailing_stop:.2f} | 回撤窗口: {trailing_window*100:.1f}%")
+            else:
+                trend_score = position.get('trend_score', 0)
+                if trend_score >= 8:
+                    activation_threshold = 0.5
+                elif trend_score >= 6:
+                    activation_threshold = 0.8
+                else:
+                    activation_threshold = 1.0
+                print(f"   ⏸️  移动止盈: 未激活 (需盈利>{activation_threshold:.1f}%，当前: {profit_pct:.2f}%)")
             
             # 峰值盈利信息
             if position.get('peak_profit', 0) > 0:
@@ -1032,6 +1272,11 @@ class RealTimePriceMonitor:
             # 检查止损止盈条件
             if self._should_close_position(current_price, profit_pct):
                 self._execute_emergency_close(current_price, profit_pct)
+                # 🔧 修复：平仓后立即返回，避免继续执行订单更新逻辑，防止创建残留订单
+                return
+            
+            # 检查盈利平仓条件（在止损检查之后，止盈检查之前）
+            self._check_profit_taking_conditions(current_price, actual_profit_pct, position)
             
             # 更新移动止盈止损
             self._update_trailing_stops(current_price, profit_pct)
@@ -1044,6 +1289,304 @@ class RealTimePriceMonitor:
             
         except Exception as e:
             print(f"❌ 价格检查失败: {e}")
+    
+    def _calculate_actual_profit_with_fees(self, current_price, profit_pct):
+        """
+        计算扣除手续费后的实际盈亏百分比
+        
+        Args:
+            current_price: 当前价格
+            profit_pct: 未实现盈亏百分比（已考虑杠杆）
+        
+        Returns:
+            float: 扣除手续费后的实际盈亏百分比
+        """
+        position = self.current_position_info
+        entry_price = position.get('entry_price', 0)
+        position_size = position.get('position_size', 0)
+        contract_size = self.trade_config.get('contract_size', 0.01)
+        
+        if entry_price <= 0 or position_size <= 0:
+            # 如果无法获取有效数据，使用简化的手续费估算
+            return profit_pct - (TRADING_FEE_RATE * 100)
+        
+        # 计算开仓名义价值
+        entry_notional = position_size * contract_size * entry_price
+        
+        # 计算平仓名义价值
+        exit_notional = position_size * contract_size * current_price
+        
+        # 计算手续费（都是Taker订单，费率0.05%）
+        TAKER_FEE_RATE = 0.0005  # 0.05%
+        entry_fee = entry_notional * TAKER_FEE_RATE
+        exit_fee = exit_notional * TAKER_FEE_RATE
+        total_fee = entry_fee + exit_fee
+        
+        # 计算手续费百分比（相对于开仓名义价值）
+        fee_pct = (total_fee / entry_notional) * 100 if entry_notional > 0 else 0
+        
+        # 计算实际盈亏百分比
+        actual_profit_pct = profit_pct - fee_pct
+        
+        return actual_profit_pct
+    
+    def _validate_stop_loss_price(self, stop_loss_price, current_price, position_side):
+        """
+        验证止损价合理性
+        
+        Args:
+            stop_loss_price: 止损价格
+            current_price: 当前价格
+            position_side: 持仓方向 'long' or 'short'
+        
+        Returns:
+            bool: 是否有效
+        """
+        if stop_loss_price <= 0:
+            return False
+        
+        if position_side == 'long':
+            # 🔧 修复：多头止损价验证，从99.5%放宽到98.5%，允许更大的止损距离
+            if stop_loss_price >= current_price * 0.985:
+                return False
+        else:  # short
+            # 🔧 修复：空头止损价验证，从100.5%放宽到101.5%，允许更大的止损距离
+            if stop_loss_price <= current_price * 1.015:
+                return False
+        
+        return True
+    
+    def _is_stop_loss_improvement(self, new_stop_loss, current_stop_loss, position_side):
+        """
+        检查新止损价是否是对当前止损价的改善
+        
+        多头：新止损价 > 当前止损价（上移）
+        空头：新止损价 < 当前止损价（下移）
+        
+        Args:
+            new_stop_loss: 新止损价
+            current_stop_loss: 当前止损价
+            position_side: 持仓方向
+        
+        Returns:
+            bool: 是否改善
+        """
+        if position_side == 'long':
+            improvement = new_stop_loss > current_stop_loss * 1.001  # 至少提高0.1%
+            direction = "上移" if improvement else "未上移"
+        else:  # short
+            improvement = new_stop_loss < current_stop_loss * 0.999  # 至少降低0.1%
+            direction = "下移" if improvement else "未下移"
+        
+        print(f"   🔄 止损改善检查: {current_stop_loss:.2f} → {new_stop_loss:.2f} [{direction}]")
+        return improvement
+    
+    def _get_dynamic_lock_ratio(self, actual_profit_pct):
+        """
+        🔧 优化v2：根据盈利百分比获取动态锁定比例
+        
+        Args:
+            actual_profit_pct: 实际盈利百分比（扣除手续费后）
+        
+        Returns:
+            float: 锁定比例（0-1之间）
+        """
+        profit_decimal = actual_profit_pct / 100
+        
+        for level_name, level_config in LOCK_STOP_LOSS_RATIOS.items():
+            if level_config['min_profit'] <= profit_decimal < level_config['max_profit']:
+                return level_config['ratio']
+        
+        # 默认返回最高比例
+        return LOCK_STOP_LOSS_RATIOS['high']['ratio']
+    
+    def _calculate_locked_stop_loss(self, current_price, actual_profit_pct):
+        """
+        计算锁定止损价格 - 🔧 修复：基于历史最高盈利点计算，确保不回退
+        🔧 优化v2：使用分段锁定比例（盈利越高，锁定比例越大）
+        
+        Args:
+            current_price: 当前价格
+            actual_profit_pct: 实际盈利百分比（扣除手续费后）
+        
+        Returns:
+            float or None: 锁定止损价，如果无效则返回None
+        """
+        position = self.current_position_info
+        config = self.lock_stop_loss_config
+        breakeven_price = config['breakeven_price']
+        
+        if breakeven_price <= 0:
+            print(f"   ⚠️ 盈亏平衡价无效: {breakeven_price:.2f}")
+            return None
+        
+        # 🔧 优化v2：获取动态锁定比例
+        dynamic_lock_ratio = self._get_dynamic_lock_ratio(actual_profit_pct)
+        if dynamic_lock_ratio != config['lock_ratio']:
+            print(f"   🎯 使用动态锁定比例: {dynamic_lock_ratio*100:.0f}% (盈利: {actual_profit_pct:.2f}%)")
+        
+        # 🔧 关键修复：更新历史最高盈利点价格
+        if position['position_side'] == 'long':
+            # 多头：记录历史最高价格
+            if config['peak_profit_price'] == 0 or current_price > config['peak_profit_price']:
+                old_peak = config['peak_profit_price']
+                config['peak_profit_price'] = current_price
+                if old_peak > 0:
+                    print(f"   📈 更新历史最高价: {old_peak:.2f} → {current_price:.2f}")
+                else:
+                    print(f"   📈 记录历史最高价: {current_price:.2f}")
+        else:  # short
+            # 空头：记录历史最低价格（对空头来说是最有利的）
+            if config['peak_profit_price'] == 0 or current_price < config['peak_profit_price']:
+                old_peak = config['peak_profit_price']
+                config['peak_profit_price'] = current_price
+                if old_peak > 0:
+                    print(f"   📉 更新历史最低价: {old_peak:.2f} → {current_price:.2f}")
+                else:
+                    print(f"   📉 记录历史最低价: {current_price:.2f}")
+        
+        # 🔧 关键修复：使用历史最高盈利点价格计算，而不是当前价格
+        peak_price = config['peak_profit_price']
+        if peak_price == 0:
+            peak_price = current_price  # 如果没有记录，使用当前价格
+        
+        print(f"🔧 锁定止损计算:")
+        print(f"   - 持仓方向: {position['position_side']}")
+        print(f"   - 入场价: {position['entry_price']:.2f}")
+        print(f"   - 盈亏平衡价: {breakeven_price:.2f}")
+        print(f"   - 当前价格: {current_price:.2f}")
+        print(f"   - 历史最高盈利点: {peak_price:.2f}")
+        print(f"   - 实际盈利: {actual_profit_pct:.2f}%")
+        
+        if position['position_side'] == 'long':
+            # 多头锁定止损计算 - 基于历史最高价格
+            if config['locked_stop_price'] == 0:
+                # 首次计算：使用盈亏平衡点 + 缓冲
+                locked_stop = breakeven_price * (1 + config['buffer_ratio'])
+                print(f"   - 首次锁定: 盈亏平衡{breakeven_price:.2f} + 缓冲{config['buffer_ratio']*100:.1f}% = {locked_stop:.2f}")
+            else:
+                # 后续计算：使用历史最高价格和动态锁定比例
+                price_range = peak_price - breakeven_price
+                locked_stop = breakeven_price + (price_range * dynamic_lock_ratio)
+                print(f"   - 比例锁定: {breakeven_price:.2f} + ({peak_price:.2f}-{breakeven_price:.2f})×{dynamic_lock_ratio*100:.0f}% = {locked_stop:.2f}")
+            
+            # 确保最小锁定距离
+            min_lock_price = breakeven_price * (1 + config['min_lock_distance'])
+            if locked_stop < min_lock_price:
+                print(f"   - 应用最小锁定距离: {locked_stop:.2f} → {min_lock_price:.2f}")
+                locked_stop = min_lock_price
+            
+            # 🔧 关键修复：确保不低于当前止损价（只能上移，不能回退）
+            # 如果计算出的止损价低于当前止损价，使用当前止损价（保持不回退）
+            if locked_stop < position['stop_loss']:
+                print(f"   - 价格回撤，保持止损价不变: {locked_stop:.2f} < 当前止损 {position['stop_loss']:.2f}")
+                locked_stop = position['stop_loss']  # 保持当前止损价，不回退
+            
+            # 确保不超过当前价格的安全范围
+            max_allowed_stop = current_price * 0.995  # 当前价格的99.5%
+            if locked_stop >= max_allowed_stop:
+                print(f"   - OKX限制: 不能高于当前价格{current_price:.2f}的99.5% ({max_allowed_stop:.2f})")
+                locked_stop = max_allowed_stop
+                # 如果被限制后的止损价低于当前止损价，保持当前止损价
+                if locked_stop < position['stop_loss']:
+                    print(f"   - 限制后止损价低于当前止损，保持当前止损价: {position['stop_loss']:.2f}")
+                    locked_stop = position['stop_loss']
+                
+        else:  # short - 修复空头逻辑
+            if config['locked_stop_price'] == 0:
+                # 首次计算：使用盈亏平衡点 - 缓冲
+                locked_stop = breakeven_price * (1 - config['buffer_ratio'])
+                print(f"   - 首次锁定: 盈亏平衡{breakeven_price:.2f} - 缓冲{config['buffer_ratio']*100:.1f}% = {locked_stop:.2f}")
+            else:
+                # 后续计算：使用历史最低价格（对空头最有利）和动态锁定比例
+                price_range = breakeven_price - peak_price
+                locked_stop = breakeven_price - (price_range * dynamic_lock_ratio)
+                print(f"   - 比例锁定: {breakeven_price:.2f} - ({breakeven_price:.2f}-{peak_price:.2f})×{dynamic_lock_ratio*100:.0f}% = {locked_stop:.2f}")
+            
+            # 确保最小锁定距离
+            min_lock_price = breakeven_price * (1 - config['min_lock_distance'])
+            if locked_stop > min_lock_price:
+                print(f"   - 应用最小锁定距离: {locked_stop:.2f} → {min_lock_price:.2f}")
+                locked_stop = min_lock_price
+            
+            # 🔧 修复空头OKX限制：止损价不能低于当前价格的100.5%
+            min_allowed_stop = current_price * 1.005  # 当前价格的100.5%
+            if locked_stop < min_allowed_stop:
+                print(f"   - OKX限制: 不能低于当前价格{current_price:.2f}的100.5% ({min_allowed_stop:.2f})")
+                locked_stop = min_allowed_stop
+            
+            # 🔧 关键修复：确保不超过当前止损价（空头只能下移，即数值变小）
+            # 如果计算出的止损价高于当前止损价，使用当前止损价（保持不回退）
+            if locked_stop > position['stop_loss']:
+                print(f"   - 价格回撤，保持止损价不变: {locked_stop:.2f} > 当前止损 {position['stop_loss']:.2f}")
+                locked_stop = position['stop_loss']  # 保持当前止损价，不回退
+        
+        print(f"   ✅ 最终锁定止损价: {locked_stop:.2f}")
+        return locked_stop
+    
+    def _calculate_sliding_stop_loss(self, current_price, profit_pct, position):
+        """
+        计算滑动止损价格（原有逻辑）
+        
+        Args:
+            current_price: 当前价格
+            profit_pct: 盈亏百分比
+            position: 持仓信息
+        
+        Returns:
+            tuple: (new_stop_loss, should_update, stop_reason)
+        """
+        new_stop_loss = None
+        should_update = False
+        stop_reason = "滑动止损"
+        
+        if position['position_side'] == 'long':
+            # 多头：价格有利时，止损位上移
+            if profit_pct > 0.3:  # 盈利超过0.3%时开始滑动
+                # 新的止损位：至少保护0.2%利润，或使用入场价+0.2%
+                new_stop_loss = max(
+                    position['entry_price'] * 1.002,  # 至少保护0.2%利润
+                    position['stop_loss']  # 不能低于当前止损
+                )
+                
+                # 🔧 修复：新止损不能高于当前价格（标记价格），否则OKX会拒绝
+                max_allowed_stop = current_price * 0.995  # 当前价格的99.5%
+                if new_stop_loss >= max_allowed_stop:
+                    new_stop_loss = max_allowed_stop
+                    print(f"⚠️ 滑动止损被限制：不能高于当前价格，使用 {new_stop_loss:.2f} (当前价: {current_price:.2f})")
+                    if new_stop_loss <= position['stop_loss'] * 1.001:
+                        should_update = False
+                        print(f"⚠️ 限制后的止损价不高于当前止损，跳过更新")
+                
+                # 只有当新止损位明显高于当前止损时才更新（至少提高0.1%）
+                if new_stop_loss > position['stop_loss'] * 1.001:
+                    should_update = True
+                    print(f"📈 滑动止损：当前止损 {position['stop_loss']:.2f} → 新止损 {new_stop_loss:.2f} (保护利润: {profit_pct:.2f}%)")
+        
+        else:  # short
+            # 空头：价格有利时，止损位下移
+            if profit_pct > 0.3:  # 盈利超过0.3%时开始滑动
+                # 新的止损位：至少保护0.2%利润，或使用入场价-0.2%
+                new_stop_loss = min(
+                    position['entry_price'] * 0.998,  # 至少保护0.2%利润
+                    position['stop_loss']  # 不能高于当前止损
+                )
+                
+                # 🔧 修复：新止损不能低于当前价格（标记价格），否则OKX会拒绝
+                min_allowed_stop = current_price * 1.005  # 当前价格的100.5%
+                if new_stop_loss <= min_allowed_stop:
+                    new_stop_loss = min_allowed_stop
+                    print(f"⚠️ 滑动止损被限制：不能低于当前价格，使用 {new_stop_loss:.2f} (当前价: {current_price:.2f})")
+                    if new_stop_loss >= position['stop_loss'] * 0.999:
+                        should_update = False
+                        print(f"⚠️ 限制后的止损价不低于当前止损，跳过更新")
+                
+                # 只有当新止损位明显低于当前止损时才更新（至少降低0.1%）
+                if new_stop_loss < position['stop_loss'] * 0.999:
+                    should_update = True
+                    print(f"📉 滑动止损：当前止损 {position['stop_loss']:.2f} → 新止损 {new_stop_loss:.2f} (保护利润: {profit_pct:.2f}%)")
+        
+        return new_stop_loss, should_update, stop_reason
     
     def _should_close_position(self, current_price, profit_pct):
         """判断是否应该平仓"""
@@ -1076,17 +1619,27 @@ class RealTimePriceMonitor:
                     print(f"🚨 空头止损触发: {current_price:.2f} >= {position['stop_loss']:.2f}")
                     return True
         
-        # 止盈检查（不受安全检查影响）
+        # 止盈检查（不受安全检查影响）- 🔧 修复：考虑手续费
         if position['position_side'] == 'long':
-            # 多头止盈
+            # 多头止盈：检查价格是否达到止盈价，且扣除手续费后仍盈利
             if current_price >= position['take_profit']:
-                print(f"🎯 多头止盈触发: {current_price:.2f} >= {position['take_profit']:.2f}")
-                return True
+                # 计算扣除手续费后的实际盈亏百分比
+                actual_profit_pct = self._calculate_actual_profit_with_fees(current_price, profit_pct)
+                if actual_profit_pct > 0:
+                    print(f"🎯 多头止盈触发: {current_price:.2f} >= {position['take_profit']:.2f}, 实际盈亏={actual_profit_pct:.2f}% (扣除手续费后)")
+                    return True
+                else:
+                    print(f"⚠️ 止盈价已触发但扣除手续费后亏损: 浮盈={profit_pct:.2f}%, 实际={actual_profit_pct:.2f}%, 继续持仓")
         else:  # short
-            # 空头止盈
+            # 空头止盈：检查价格是否达到止盈价，且扣除手续费后仍盈利
             if current_price <= position['take_profit']:
-                print(f"🎯 空头止盈触发: {current_price:.2f} <= {position['take_profit']:.2f}")
-                return True
+                # 计算扣除手续费后的实际盈亏百分比
+                actual_profit_pct = self._calculate_actual_profit_with_fees(current_price, profit_pct)
+                if actual_profit_pct > 0:
+                    print(f"🎯 空头止盈触发: {current_price:.2f} <= {position['take_profit']:.2f}, 实际盈亏={actual_profit_pct:.2f}% (扣除手续费后)")
+                    return True
+                else:
+                    print(f"⚠️ 止盈价已触发但扣除手续费后亏损: 浮盈={profit_pct:.2f}%, 实际={actual_profit_pct:.2f}%, 继续持仓")
         
         # 移动止盈检查
         if position['trailing_stop_activated']:
@@ -1113,106 +1666,316 @@ class RealTimePriceMonitor:
             
         return False
     
-    def _update_trailing_stops(self, current_price, profit_pct):
-        """更新移动止盈止损"""
+    def _check_profit_taking_conditions(self, current_price, actual_profit_pct, position):
+        """
+        检查盈利平仓条件
+        🔧 优化：根据趋势强度动态调整分批止盈阈值
+        
+        Args:
+            current_price: 当前价格
+            actual_profit_pct: 实际盈利百分比（扣除手续费后）
+            position: 持仓信息
+        """
+        config = self.profit_taking_config
+        
+        # 🔧 优化：根据趋势强度动态调整分批止盈阈值
+        trend_score = position.get('trend_score', 0)  # 从持仓信息中获取趋势强度
+        
+        if trend_score >= 8:  # 极强趋势：让利润奔跑更多
+            threshold_1 = 0.03  # 3%平仓一半
+            threshold_2 = 0.06  # 6%平仓全部
+            trend_desc = "极强趋势"
+        elif trend_score >= 6:  # 强趋势
+            threshold_1 = 0.025  # 2.5%平仓一半
+            threshold_2 = 0.05   # 5%平仓全部
+            trend_desc = "强趋势"
+        else:  # 中等趋势：使用默认值
+            threshold_1 = config['partial_close_threshold_1']  # 2%平仓一半
+            threshold_2 = config['partial_close_threshold_2']  # 4%平仓全部
+            trend_desc = "中等趋势"
+        
+        # 检查平仓间隔
+        now = datetime.now()
+        if config['last_partial_close_time']:
+            time_since_last_close = (now - config['last_partial_close_time']).total_seconds()
+            if time_since_last_close < config['min_close_interval']:
+                return
+        
+        # 检查第二次平仓条件
+        if (not config['partial_close_2_executed'] and 
+            actual_profit_pct >= threshold_2 * 100):
+            
+            print(f"🎯 触发盈利平仓条件2({trend_desc}): 盈利{actual_profit_pct:.2f}% ≥ {threshold_2*100:.1f}%")
+            self._execute_profit_taking(current_price, 1.0, f"盈利{threshold_2*100:.1f}%平仓全部({trend_desc})")
+            config['partial_close_2_executed'] = True
+            config['last_partial_close_time'] = now
+            return
+        
+        # 检查第一次平仓条件
+        if (not config['partial_close_1_executed'] and 
+            actual_profit_pct >= threshold_1 * 100):
+            
+            print(f"🎯 触发盈利平仓条件1({trend_desc}): 盈利{actual_profit_pct:.2f}% ≥ {threshold_1*100:.1f}%")
+            self._execute_profit_taking(current_price, config['partial_close_ratio_1'], f"盈利{threshold_1*100:.1f}%平仓一半({trend_desc})")
+            config['partial_close_1_executed'] = True
+            config['last_partial_close_time'] = now
+    
+    def _execute_profit_taking(self, current_price, close_ratio, reason):
+        """
+        执行盈利平仓
+        
+        Args:
+            current_price: 当前价格
+            close_ratio: 平仓比例 (0.0-1.0)
+            reason: 平仓原因
+        """
         position = self.current_position_info
+        config = self.profit_taking_config
+        
+        if not position['position_side'] or position['position_size'] <= 0:
+            print("⚠️ 无持仓，跳过盈利平仓")
+            return
+        
+        try:
+            # 计算平仓数量
+            close_size = position['position_size'] * close_ratio
+            close_size = round(close_size, 2)  # 保留2位小数
+            
+            # 确保不低于最小平仓数量
+            if close_size < config['min_partial_close_size']:
+                close_size = config['min_partial_close_size']
+                print(f"⚠️ 平仓数量调整到最小值: {close_size}")
+            
+            # 确保不超过当前持仓
+            if close_size > position['position_size']:
+                close_size = position['position_size']
+                print(f"⚠️ 平仓数量调整到持仓总量: {close_size}")
+            
+            print(f"💰 执行盈利平仓: {close_size:.2f}张 ({close_ratio*100:.0f}%) - {reason}")
+            
+            # 执行平仓
+            if position['position_side'] == 'long':
+                self.exchange.create_market_order(
+                    self.trade_config['symbol'],
+                    'sell',
+                    close_size,
+                    params={'reduceOnly': True}
+                )
+            else:  # short
+                self.exchange.create_market_order(
+                    self.trade_config['symbol'],
+                    'buy',
+                    close_size,
+                    params={'reduceOnly': True}
+                )
+            
+            print(f"✅ 盈利平仓成功: {close_size:.2f}张 @ {current_price:.2f}")
+            
+            # 更新持仓信息
+            remaining_size = position['position_size'] - close_size
+            
+            if remaining_size <= 0.001:  # 接近0，视为全部平仓
+                print("🎯 持仓已全部平仓")
+                self.clear_position_info()
+            else:
+                # 更新持仓数量
+                position['position_size'] = remaining_size
+                print(f"📊 剩余持仓: {remaining_size:.2f}张")
+                
+                # 更新止盈止损订单（因为持仓数量变化）
+                self._update_tp_sl_for_partial_close(remaining_size)
+                
+        except Exception as e:
+            print(f"❌ 盈利平仓失败: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _update_tp_sl_for_partial_close(self, new_position_size):
+        """
+        部分平仓后更新止盈止损订单
+        
+        Args:
+            new_position_size: 新的持仓数量
+        """
+        position = self.current_position_info
+        
+        try:
+            # 取消旧订单
+            if position['tp_sl_order_ids']:
+                cancel_tp_sl_orders(self.trade_config['symbol'], position['tp_sl_order_ids'])
+                time.sleep(0.3)
+            
+            # 设置新订单（使用新的持仓数量）
+            new_order_ids = set_tp_sl_orders(
+                self.trade_config['symbol'],
+                position['position_side'],
+                new_position_size,
+                position['stop_loss'],
+                position['take_profit'],
+                position['entry_price']
+            )
+            
+            if new_order_ids:
+                position['tp_sl_order_ids'] = new_order_ids
+                print(f"✅ 止盈止损订单已更新: 新仓位 {new_position_size:.2f}张")
+            else:
+                print("⚠️ 止盈止损订单更新失败，继续使用代码监控")
+                
+        except Exception as e:
+            print(f"⚠️ 更新止盈止损订单时出错: {e}")
+    
+    def _update_trailing_stops(self, current_price, profit_pct):
+        """更新移动止盈止损
+        🔧 优化：根据趋势强度动态调整移动止盈激活条件和回撤窗口
+        """
+        position = self.current_position_info
+        
+        # 🔧 优化：根据趋势强度动态调整移动止盈参数
+        trend_score = position.get('trend_score', 0)
+        if trend_score >= 8:  # 极强趋势
+            trailing_activation = 0.5  # 0.5%就激活
+            trailing_window = 0.01  # 1%回撤窗口（更宽松）
+        elif trend_score >= 6:  # 强趋势
+            trailing_activation = 0.8  # 0.8%激活
+            trailing_window = 0.007  # 0.7%回撤窗口
+        else:  # 中等趋势
+            trailing_activation = 1.0  # 1%激活
+            trailing_window = 0.005  # 0.5%回撤窗口
         
         # 更新峰值盈亏
         if position['position_side'] == 'long':
             if current_price > position['highest_profit']:
                 position['highest_profit'] = current_price
-                # 盈利超过1%时激活移动止盈
-                if profit_pct > 1 and not position['trailing_stop_activated']:
+                # 🔧 优化：根据趋势强度动态激活移动止盈
+                if profit_pct > trailing_activation and not position['trailing_stop_activated']:
                     position['trailing_stop_activated'] = True
-                    print("🎯 移动止盈已激活")
+                    trend_desc = "极强趋势" if trend_score >= 8 else "强趋势" if trend_score >= 6 else "中等趋势"
+                    print(f"🎯 移动止盈已激活（盈利{profit_pct:.2f}% > {trailing_activation:.1f}%，{trend_desc}）")
         else:  # short
             if current_price < position['lowest_profit']:
                 position['lowest_profit'] = current_price
-                # 盈利超过1%时激活移动止盈
-                if profit_pct > 1 and not position['trailing_stop_activated']:
+                # 🔧 优化：根据趋势强度动态激活移动止盈
+                if profit_pct > trailing_activation and not position['trailing_stop_activated']:
                     position['trailing_stop_activated'] = True
-                    print("🎯 移动止盈已激活")
+                    trend_desc = "极强趋势" if trend_score >= 8 else "强趋势" if trend_score >= 6 else "中等趋势"
+                    print(f"🎯 移动止盈已激活（盈利{profit_pct:.2f}% > {trailing_activation:.1f}%，{trend_desc}）")
         
         # 更新峰值盈利记录
         if profit_pct > position.get('peak_profit', 0):
             position['peak_profit'] = profit_pct
+        
+        # 🔧 优化：保存回撤窗口到持仓信息（用于后续计算）
+        position['trailing_window'] = trailing_window
     
     def _update_sliding_stop_loss_to_exchange(self, current_price, profit_pct):
         """
-        当价格有利时，实时更新止损位到交易所（滑动止损）
-        实现真正的"窄窗口+频繁滑动"策略
+        当价格有利时，实时更新止损位到交易所（滑动止损 + 锁定止损）
+        实现真正的"窄窗口+频繁滑动"策略，并在盈利达到阈值时锁定利润
         
         Args:
             current_price: 当前价格
-            profit_pct: 当前盈亏百分比
+            profit_pct: 当前盈亏百分比（未扣除手续费）
         """
         position = self.current_position_info
         
-        # 检查是否有持仓和订单
-        if not position['position_side'] or not position['tp_sl_order_ids']:
+        # 🔧 修复：检查是否有持仓和订单，增加 position_size 检查，防止平仓后仍尝试更新订单
+        if not position['position_side'] or not position['tp_sl_order_ids'] or position['position_size'] <= 0:
             return
         
-        # 检查更新频率：避免过于频繁更新
+        # 计算实际盈利（扣除手续费后的净盈利）
+        try:
+            actual_profit_pct = self._calculate_actual_profit_with_fees(current_price, profit_pct)
+        except:
+            actual_profit_pct = profit_pct - (TRADING_FEE_RATE * 100)
+        
+        # 🔧 优化：当接近或达到锁定止损阈值时，提高更新频率
+        current_interval = self.min_update_interval
+        threshold_pct = self.lock_stop_loss_config['profit_threshold'] * 100
+        if actual_profit_pct >= (threshold_pct * 0.8):  # 达到阈值的80%
+            self.min_update_interval = 10  # 缩短到10秒
+            if current_interval != 10:
+                print(f"🚀 提高更新频率: 30秒 → 10秒 (接近锁定止损阈值)")
+        else:
+            self.min_update_interval = ORBIT_UPDATE_INTERVAL  # 恢复60秒
+        
+        # 检查更新频率
         now = datetime.now()
         if self.last_order_update_time:
             time_since_last_update = (now - self.last_order_update_time).total_seconds()
             if time_since_last_update < self.min_update_interval:
-                return  # 距离上次更新不足30秒，跳过
+                return
+        
+        # 🔧 详细调试日志
+        print(f"🔍 止损更新检查:")
+        print(f"   - 浮盈: {profit_pct:.2f}%, 实际盈利: {actual_profit_pct:.2f}% (扣除手续费)")
+        print(f"   - 锁定止损阈值: {threshold_pct:.1f}%")
+        print(f"   - 锁定状态: {'已激活' if self.lock_stop_loss_config['activated'] else '未激活'}")
         
         try:
-            # 使用全局的update_tp_sl_orders函数（已在文件顶部定义）
+            # 计算盈亏平衡点（考虑手续费）
+            entry_price = position['entry_price']
+            if position['position_side'] == 'long':
+                # 多头：盈亏平衡价 = 入场价 × (1 + 手续费率)
+                break_even_price = entry_price * (1 + TRADING_FEE_RATE)
+            else:  # short
+                # 空头：盈亏平衡价 = 入场价 × (1 - 手续费率)
+                break_even_price = entry_price * (1 - TRADING_FEE_RATE)
+            
+            # 更新配置中的盈亏平衡价
+            self.lock_stop_loss_config['breakeven_price'] = break_even_price
+            
+            # 检查是否应该激活锁定止损
+            should_activate_lock = (actual_profit_pct >= threshold_pct)
+            
             new_stop_loss = None
             should_update = False
+            stop_reason = ""
             
-            if position['position_side'] == 'long':
-                # 多头：价格有利时，止损位上移
-                if profit_pct > 0.3:  # 盈利超过0.3%时开始滑动
-                    # 新的止损位：至少保护0.2%利润，或使用入场价+0.2%
-                    new_stop_loss = max(
-                        position['entry_price'] * 1.002,  # 至少保护0.2%利润
-                        position['stop_loss']  # 不能低于当前止损
-                    )
-                    
-                    # 🔧 修复：新止损不能高于当前价格（标记价格），否则OKX会拒绝
-                    # 确保新止损至少低于当前价格的0.5%（给标记价格更多缓冲，避免被拒绝）
-                    max_allowed_stop = current_price * 0.995  # 当前价格的99.5%（从99.8%改为99.5%，更严格）
-                    if new_stop_loss >= max_allowed_stop:
-                        new_stop_loss = max_allowed_stop
-                        print(f"⚠️ 滑动止损被限制：不能高于当前价格，使用 {new_stop_loss:.2f} (当前价: {current_price:.2f})")
-                        # 如果被限制后的止损价不高于当前止损，则不需要更新
-                        if new_stop_loss <= position['stop_loss'] * 1.001:
-                            should_update = False
-                            print(f"⚠️ 限制后的止损价不高于当前止损，跳过更新")
-                    
-                    # 只有当新止损位明显高于当前止损时才更新（至少提高0.1%）
-                    if new_stop_loss > position['stop_loss'] * 1.001:
-                        should_update = True
-                        print(f"📈 滑动止损：当前止损 {position['stop_loss']:.2f} → 新止损 {new_stop_loss:.2f} (保护利润: {profit_pct:.2f}%)")
+            # 🔒 锁定止损逻辑（盈利达到阈值时优先使用）
+            if should_activate_lock and not self.lock_stop_loss_config['activated']:
+                # 首次激活锁定止损
+                self.lock_stop_loss_config['activated'] = True
+                print(f"🎯 锁定止损已激活！实际盈利: {actual_profit_pct:.2f}% ≥ {threshold_pct:.1f}%")
             
-            else:  # short
-                # 空头：价格有利时，止损位下移
-                if profit_pct > 0.3:  # 盈利超过0.3%时开始滑动
-                    # 新的止损位：至少保护0.2%利润，或使用入场价-0.2%
-                    new_stop_loss = min(
-                        position['entry_price'] * 0.998,  # 至少保护0.2%利润
-                        position['stop_loss']  # 不能高于当前止损
-                    )
+            if self.lock_stop_loss_config['activated']:
+                # 使用锁定止损逻辑
+                new_stop_loss = self._calculate_locked_stop_loss(current_price, actual_profit_pct)
+                stop_reason = "锁定止损"
+                
+                if new_stop_loss:
+                    # 🔧 关键修复：如果锁定止损已激活，即使计算出的止损价等于当前止损价，也应该保持
+                    # 确保止损价不会回退（只能向更优方向移动或保持不变）
+                    if position['position_side'] == 'long':
+                        is_valid = new_stop_loss >= position['stop_loss']
+                    else:  # short
+                        is_valid = new_stop_loss <= position['stop_loss']
                     
-                    # 🔧 修复：新止损不能低于当前价格（标记价格），否则OKX会拒绝
-                    # 确保新止损至少高于当前价格的0.5%（给标记价格更多缓冲，避免被拒绝）
-                    min_allowed_stop = current_price * 1.005  # 当前价格的100.5%（从100.2%改为100.5%，更严格）
-                    if new_stop_loss <= min_allowed_stop:
-                        new_stop_loss = min_allowed_stop
-                        print(f"⚠️ 滑动止损被限制：不能低于当前价格，使用 {new_stop_loss:.2f} (当前价: {current_price:.2f})")
-                        # 如果被限制后的止损价不低于当前止损，则不需要更新
-                        if new_stop_loss >= position['stop_loss'] * 0.999:
-                            should_update = False
-                            print(f"⚠️ 限制后的止损价不低于当前止损，跳过更新")
-                    
-                    # 只有当新止损位明显低于当前止损时才更新（至少降低0.1%）
-                    if new_stop_loss < position['stop_loss'] * 0.999:
-                        should_update = True
-                        print(f"📉 滑动止损：当前止损 {position['stop_loss']:.2f} → 新止损 {new_stop_loss:.2f} (保护利润: {profit_pct:.2f}%)")
+                    if is_valid:
+                        # 验证止损价合理性
+                        if self._validate_stop_loss_price(new_stop_loss, current_price, position['position_side']):
+                            # 检查止损价是否改善或保持不变
+                            if self._is_stop_loss_improvement(new_stop_loss, position['stop_loss'], position['position_side']) or new_stop_loss == position['stop_loss']:
+                                # 如果止损价改善，才更新；如果相等，说明价格回撤但保持止损价不变，不需要更新订单
+                                if new_stop_loss != position['stop_loss']:
+                                    should_update = True
+                                    print(f"✅ 锁定止损计算: {position['stop_loss']:.2f} → {new_stop_loss:.2f}")
+                                else:
+                                    print(f"✅ 锁定止损保持: {new_stop_loss:.2f} (价格回撤，止损价不变)")
+                            else:
+                                print(f"⚠️ 锁定止损价未改善: {new_stop_loss:.2f} vs 当前 {position['stop_loss']:.2f}")
+                        else:
+                            print(f"⚠️ 锁定止损价验证失败: {new_stop_loss:.2f}")
+                    else:
+                        # 这种情况不应该发生，因为_calculate_locked_stop_loss已经处理了
+                        print(f"⚠️ 锁定止损价异常: {new_stop_loss:.2f} vs 当前 {position['stop_loss']:.2f}，保持当前止损价")
+                else:
+                    # 🔧 关键修复：如果锁定止损已激活但计算返回None，保持当前止损价不变
+                    print(f"⚠️ 锁定止损计算返回None，保持当前止损价不变: {position['stop_loss']:.2f}")
+            else:
+                # 使用原有的滑动止损逻辑
+                new_stop_loss, should_update, stop_reason = self._calculate_sliding_stop_loss(
+                    current_price, profit_pct, position
+                )
             
             # 执行更新
             if should_update and new_stop_loss:
@@ -1220,27 +1983,32 @@ class RealTimePriceMonitor:
                     self.trade_config['symbol'],
                     position['position_side'],
                     position['position_size'],
-                    new_stop_loss,  # 新的止损
-                    position['take_profit'],  # 止盈不变
-                    position['tp_sl_order_ids']  # 旧订单ID
+                    new_stop_loss,
+                    position['take_profit'],
+                    position['tp_sl_order_ids']
                 )
                 
-                # 🔧 修复：只有当止损订单ID存在且不为None时，才更新内存中的止损价
                 if new_order_ids and new_order_ids.get('sl_order_id'):
-                    # 更新内存中的止损位和订单ID
+                    old_stop_loss = position['stop_loss']
                     position['stop_loss'] = new_stop_loss
                     position['tp_sl_order_ids'] = new_order_ids
                     self.last_order_update_time = now
-                    print(f"✅ 滑动止损已同步到交易所: {new_stop_loss:.2f} (订单ID: {new_order_ids['sl_order_id']})")
+                    
+                    # 如果是锁定止损，更新锁定价格
+                    if self.lock_stop_loss_config['activated']:
+                        self.lock_stop_loss_config['locked_stop_price'] = new_stop_loss
+                    
+                    print(f"🎯 {stop_reason}更新成功: {old_stop_loss:.2f} → {new_stop_loss:.2f}")
+                    print(f"   📊 订单ID: {new_order_ids['sl_order_id']}")
                 else:
-                    # 止损订单设置失败，不更新内存，保持原止损价不变
-                    print(f"⚠️ 滑动止损订单设置失败，保持原止损价 {position['stop_loss']:.2f} 不变")
+                    print(f"⚠️ {stop_reason}订单设置失败，保持原止损价 {position['stop_loss']:.2f}")
                     if new_order_ids and new_order_ids.get('tp_order_id'):
                         print(f"   ℹ️ 止盈订单已更新，但止损订单失败，继续使用代码监控原止损价")
         
         except Exception as e:
-            print(f"⚠️ 更新滑动止损到交易所时出错: {e}")
-            # 不影响主流程，继续使用代码监控
+            print(f"❌ 止损更新异常: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _update_trailing_stop_to_exchange(self, current_price, profit_pct):
         """
@@ -1253,8 +2021,8 @@ class RealTimePriceMonitor:
         """
         position = self.current_position_info
         
-        # 检查移动止盈是否激活
-        if not position['trailing_stop_activated'] or not position['tp_sl_order_ids']:
+        # 🔧 修复：检查移动止盈是否激活，增加 position_side 和 position_size 检查，防止平仓后仍尝试更新订单
+        if not position['position_side'] or position['position_size'] <= 0 or not position['trailing_stop_activated'] or not position['tp_sl_order_ids']:
             return
         
         # 检查更新频率
@@ -1748,6 +2516,25 @@ def update_tp_sl_orders(symbol, position_side, position_size, stop_loss_price, t
         dict: 新的订单ID字典
     """
     try:
+        # 🔧 修复：在设置新订单前，先验证实际持仓状态，防止无持仓时创建残留订单
+        try:
+            actual_position = get_current_position()
+            if not actual_position or actual_position['size'] <= 0:
+                print(f"⚠️ 更新止盈止损订单时检测到实际无持仓，取消操作，避免创建残留订单")
+                # 仍然尝试取消旧订单，但不创建新订单
+                if old_order_ids:
+                    cancel_tp_sl_orders(symbol, old_order_ids)
+                return None
+            
+            # 验证持仓方向是否匹配
+            if actual_position['side'] != position_side:
+                print(f"⚠️ 更新止盈止损订单时检测到持仓方向不匹配（实际: {actual_position['side']}, 预期: {position_side}），取消操作")
+                if old_order_ids:
+                    cancel_tp_sl_orders(symbol, old_order_ids)
+                return None
+        except Exception as e:
+            print(f"⚠️ 验证实际持仓时出错，继续执行订单更新: {e}")
+        
         # 先取消旧订单
         if old_order_ids:
             cancel_tp_sl_orders(symbol, old_order_ids)
@@ -2369,27 +3156,76 @@ def calculate_trend_based_position(signal_data, price_data, current_position):
     final_utilization = final_margin / total_balance if total_balance > 0 else 0
     final_trade_amount = optimal_contract_size * contract_value_per_unit
     
-    # 趋势强度信息（用于日志显示）
+    # 趋势强度信息（用于日志显示和仓位调整）
     trend_score = signal_data.get('trend_score', 0)
     if trend_score >= 8:
+        trend_desc = "极强趋势"
+    elif trend_score >= 7:
         trend_desc = "强趋势"
-    elif trend_score >= 6:
+    elif trend_score >= 5:
         trend_desc = "中等趋势"
     elif trend_score >= 4:
         trend_desc = "正常趋势"
     else:
         trend_desc = "弱趋势"
     
-    print(f"📊 趋势为王仓位管理（基于风险反推）:")
+    # 🔧 优化：根据趋势强度过滤，中等趋势降低仓位50%
+    trend_strength_multiplier = 1.0
+    if trend_score >= 7:
+        # 强趋势：正常仓位
+        trend_strength_multiplier = 1.0
+        print(f"✅ 强趋势({trend_score}/10)：正常仓位")
+    elif trend_score >= 5:
+        # 中等趋势：降低仓位50%
+        trend_strength_multiplier = 0.5
+        print(f"⚠️ 中等趋势({trend_score}/10)：降低仓位50%")
+    else:
+        # 弱趋势：不应该交易（已在信号生成时过滤），但这里作为保护
+        trend_strength_multiplier = 0.3
+        print(f"❌ 弱趋势({trend_score}/10)：极低仓位（建议观望）")
+    
+    # 应用趋势强度过滤乘数
+    optimal_contract_size = optimal_contract_size * trend_strength_multiplier
+    
+    # 🎯 布林带位置作为结构优化乘数
+    bb_position = price_data['technical_data'].get('bb_position', 0.5)
+    structure_multiplier = 1.0
+    
+    if bb_position < 0.1 or bb_position > 0.9:
+        # 布林带极端位置：如果是顺势，可能是趋势加速；如果是逆势，需要谨慎
+        if (signal_data['signal'] == 'BUY' and bb_position < 0.1) or (signal_data['signal'] == 'SELL' and bb_position > 0.9):
+            # 顺势的布林带极端位置：趋势加速信号，可以适当增加仓位
+            structure_multiplier = 1.2
+            print(f"🚀 布林带极端位置顺势：趋势加速信号，仓位乘数 ×{structure_multiplier}")
+        else:
+            # 逆势的布林带极端位置：需要谨慎，降低仓位
+            structure_multiplier = 0.7
+            print(f"⚠️ 布林带极端位置逆势：谨慎交易，仓位乘数 ×{structure_multiplier}")
+    elif bb_position < 0.2 or bb_position > 0.8:
+        # 布林带边缘位置：正常结构信号
+        structure_multiplier = 1.0
+    else:
+        # 布林带中部：无特殊结构信号
+        structure_multiplier = 0.9
+        print(f"📊 布林带中部：无明确结构信号，仓位乘数 ×{structure_multiplier}")
+    
+    # 应用结构优化乘数
+    optimal_contract_size = optimal_contract_size * structure_multiplier
+    optimal_contract_size = round(optimal_contract_size, 2)
+    
+    # 重新计算最终保证金和资金利用率
+    final_margin = (optimal_contract_size * contract_value_per_unit) / optimal_leverage
+    final_utilization = final_margin / total_balance if total_balance > 0 else 0
+    final_trade_amount = optimal_contract_size * contract_value_per_unit
+    
+    print(f"📊 趋势为王仓位管理（结构优化）:")
     print(f"   - 止损距离: {stop_loss_distance_pct:.2%}")
-    print(f"   - 最大可承受亏损: {max_acceptable_loss:.2f} USDT (3%)")
-    print(f"   - 最大安全交易金额: {max_safe_trade_amount:.2f} USDT")
-    print(f"   - 趋势强度: {trend_score}/10 ({trend_desc})")
+    print(f"   - 趋势强度: {trend_score}/10 ({trend_desc}) → 趋势过滤乘数 ×{trend_strength_multiplier}")
+    print(f"   - 布林带位置: {bb_position:.3f} → 结构乘数 ×{structure_multiplier}")
     print(f"   - 最优杠杆: {optimal_leverage}x")
     print(f"   - 最终仓位: {optimal_contract_size:.2f} 张")
     print(f"   - 实际交易金额: {final_trade_amount:.2f} USDT")
-    print(f"   - 实际保证金: {final_margin:.2f} USDT")
-    print(f"   - 资金利用率: {final_utilization:.1%} (目标: {target_utilization:.0%}, 上限: {max_utilization:.0%})")
+    print(f"   - 资金利用率: {final_utilization:.1%}")
     
     return {
         'contract_size': optimal_contract_size,
@@ -2486,6 +3322,46 @@ def get_market_trend(df):
         print(f"趋势分析失败: {e}")
         return {}
 
+def detect_market_regime(df):
+    """
+    识别市场环境：趋势市场 vs 震荡市场
+    🔧 优化：用于减少在震荡市场的无效交易
+    
+    Args:
+        df: 包含技术指标的DataFrame
+        
+    Returns:
+        str: 'trending' (趋势市场) 或 'ranging' (震荡市场)
+    """
+    try:
+        current_price = df['close'].iloc[-1]
+        sma_20 = df['sma_20'].iloc[-1]
+        sma_50 = df['sma_50'].iloc[-1]
+        
+        # 计算价格相对均线的偏离度
+        price_vs_sma20 = abs((current_price - sma_20) / sma_20) if sma_20 > 0 else 0
+        price_vs_sma50 = abs((current_price - sma_50) / sma_50) if sma_50 > 0 else 0
+        
+        # 计算最近20根K线的价格波动范围
+        recent_high = df['high'].tail(20).max()
+        recent_low = df['low'].tail(20).min()
+        price_range_pct = (recent_high - recent_low) / recent_low if recent_low > 0 else 0
+        
+        # 判断标准：
+        # 1. 价格在均线附近窄幅波动（<0.5%和<1%）
+        # 2. 最近20根K线波动范围较小（<2%）
+        # 3. 均线接近（20日均线和50日均线差距<1%）
+        sma_gap = abs((sma_20 - sma_50) / sma_50) if sma_50 > 0 else 0
+        
+        if (price_vs_sma20 < 0.005 and price_vs_sma50 < 0.01 and 
+            price_range_pct < 0.02 and sma_gap < 0.01):
+            return 'ranging'  # 震荡市场
+        else:
+            return 'trending'  # 趋势市场
+    except Exception as e:
+        print(f"⚠️ 市场环境识别失败: {e}")
+        return 'trending'  # 默认返回趋势市场
+
 def get_support_resistance_levels(df, lookback=20):
     """计算支撑阻力位"""
     try:
@@ -2543,18 +3419,46 @@ def enhanced_trend_analysis(df):
     elif ma_trend == "强势下跌":
         trend_score += 3
     
-    # 价格位置得分
+    # 价格位置得分 - 修复：考虑下跌情况
     current_price = df['close'].iloc[-1]
-    if current_price > df['sma_20'].iloc[-1]:
-        trend_score += 2
-    if current_price > df['sma_50'].iloc[-1]:
-        trend_score += 1
+    if ma_trend == "强势上涨":
+        # 上涨趋势：价格高于均线得分
+        if current_price > df['sma_20'].iloc[-1]:
+            trend_score += 2
+        if current_price > df['sma_50'].iloc[-1]:
+            trend_score += 1
+    elif ma_trend == "强势下跌":
+        # 下跌趋势：价格低于均线得分
+        if current_price < df['sma_20'].iloc[-1]:
+            trend_score += 2
+        if current_price < df['sma_50'].iloc[-1]:
+            trend_score += 1
+    else:
+        # 震荡趋势：价格相对位置得分
+        if current_price > df['sma_20'].iloc[-1]:
+            trend_score += 1
     
-    # MACD趋势得分
-    if df['macd'].iloc[-1] > df['macd_signal'].iloc[-1]:
-        trend_score += 2
-    if df['macd_histogram'].iloc[-1] > 0:
-        trend_score += 1
+    # MACD趋势得分 - 修复：考虑下跌情况
+    macd_value = df['macd'].iloc[-1]
+    macd_signal = df['macd_signal'].iloc[-1]
+    macd_histogram = df['macd_histogram'].iloc[-1]
+    
+    if ma_trend == "强势上涨":
+        # 上涨趋势：MACD金叉和正柱状图得分
+        if macd_value > macd_signal:
+            trend_score += 2
+        if macd_histogram > 0:
+            trend_score += 1
+    elif ma_trend == "强势下跌":
+        # 下跌趋势：MACD死叉和负柱状图得分
+        if macd_value < macd_signal:
+            trend_score += 2
+        if macd_histogram < 0:
+            trend_score += 1
+    else:
+        # 震荡趋势：MACD方向得分
+        if macd_value > macd_signal:
+            trend_score += 1
     
     # 成交量确认得分
     if df['volume_ratio'].iloc[-1] > 1.2:
@@ -2606,7 +3510,7 @@ def structure_timing_signals(df, primary_trend):
             signals.append("RSI超卖反弹买入机会")
     
     elif primary_trend == "强势下跌":
-        # 下跌趋势中的结构做空机会
+        # 下跌趋势中的结构做空机会 - 修复：添加更多做空信号
         if current_price > df['sma_5'].iloc[-1] and df['rsi'].iloc[-1] > 40:
             signals.append("反弹5日线做空机会")
         if current_price > df['bb_middle'].iloc[-1] and df['bb_position'].iloc[-1] > 0.6:
@@ -2615,6 +3519,11 @@ def structure_timing_signals(df, primary_trend):
             signals.append("MACD红柱放大做空机会")
         if df['rsi'].iloc[-1] > 55 and df['rsi'].iloc[-1] < df['rsi'].iloc[-2]:
             signals.append("RSI超买回落做空机会")
+        # 新增下跌趋势信号
+        if current_price > df['sma_20'].iloc[-1] and df['rsi'].iloc[-1] > 50:
+            signals.append("反弹20日线做空机会")
+        if df['bb_position'].iloc[-1] > 0.8:  # 接近布林带上轨
+            signals.append("布林带上轨阻力做空机会")
     
     return signals
 
@@ -2636,22 +3545,45 @@ def generate_trend_king_signal(price_data):
     primary_trend = trend_analysis['primary_trend']
     trend_score = trend_analysis['trend_score']
     
+    # 🔧 优化：市场环境识别
+    market_regime = detect_market_regime(df)
+    
     # 2. 结构分析 - 结构修边
     structure_signals = structure_timing_signals(df, primary_trend)
     
-    # 3. 信号生成逻辑
-    # 趋势强度决定基础信号
-    if primary_trend == "强势上涨" and trend_score >= 5:
-        base_signal = "BUY"
-        base_confidence = "HIGH" if trend_score >= 7 else "MEDIUM"
-    elif primary_trend == "强势下跌" and trend_score >= 5:
-        base_signal = "SELL"
-        base_confidence = "HIGH" if trend_score >= 7 else "MEDIUM"
-    else:
+    # 3. 信号生成逻辑 - 🔧 优化：趋势强度过滤 + 市场环境识别，提高胜率
+    # 震荡市场且趋势不强时，建议观望
+    if market_regime == 'ranging' and trend_score < 6:
+        # 震荡市场且趋势不强：建议观望
+        return {
+            "signal": "HOLD",
+            "reason": f"震荡市场且趋势不强(强度{trend_score}/10)，建议观望",
+            "confidence": "LOW",
+            "trend_score": trend_score,
+            "primary_trend": primary_trend,
+            "structure_signals": structure_signals,
+            "structure_optimized": False,
+            "risk_assessment": "高风险",
+            "market_regime": market_regime
+        }
+    
+    # 🔧 修复：严格执行趋势强度过滤，只在极强趋势中交易，减少频繁开仓平仓
+    # 提高门槛：从≥7提高到≥8，完全禁止<8的交易
+    if trend_score >= 8:  # 极强趋势：正常交易
+        if primary_trend == "强势上涨":
+            base_signal = "BUY"
+            base_confidence = "HIGH"
+        elif primary_trend == "强势下跌":
+            base_signal = "SELL"
+            base_confidence = "HIGH"
+        else:
+            base_signal = "HOLD"
+            base_confidence = "LOW"
+    else:  # 趋势强度<8：坚决观望，禁止交易
         base_signal = "HOLD"
         base_confidence = "LOW"
     
-    # 4. 结构信号优化
+    # 4. 🔧 优化：结构信号优化入场时机
     final_signal = base_signal
     final_confidence = base_confidence
     
@@ -2662,9 +3594,18 @@ def generate_trend_king_signal(price_data):
         reason = f"趋势确认({primary_trend}, 强度{trend_score}/10)，结构信号:{', '.join(structure_signals)}"
         structure_optimized = True
     elif base_signal != "HOLD":
-        # 有趋势但无结构信号 - 仍可交易，但需控制仓位
-        reason = f"趋势确认({primary_trend}, 强度{trend_score}/10)，等待更好结构时机"
-        structure_optimized = False
+        # 🔧 优化：极强趋势但无结构信号时，等待更好时机
+        # 注意：base_signal != "HOLD"意味着trend_score >= 8（因为门槛已提高到≥8）
+        if trend_score >= 8:
+            # 极强趋势但无结构信号：建议等待，不立即入场
+            final_signal = "HOLD"
+            final_confidence = "LOW"
+            reason = f"极强趋势({primary_trend}, 强度{trend_score}/10)但无结构信号，等待更好入场时机"
+            structure_optimized = False
+        else:
+            # 这种情况理论上不应该发生（因为门槛已提高到≥8），但保留作为保护
+            reason = f"趋势确认({primary_trend}, 强度{trend_score}/10)，等待更好结构时机"
+            structure_optimized = False
     else:
         # 无明确趋势 - 建议观望
         reason = f"趋势不明确(强度{trend_score}/10)，建议观望"
@@ -2678,7 +3619,8 @@ def generate_trend_king_signal(price_data):
         "primary_trend": primary_trend,
         "structure_signals": structure_signals,
         "structure_optimized": structure_optimized,
-        "risk_assessment": "低风险" if final_confidence == "HIGH" else "中风险" if final_confidence == "MEDIUM" else "高风险"
+        "risk_assessment": "低风险" if final_confidence == "HIGH" else "中风险" if final_confidence == "MEDIUM" else "高风险",
+        "market_regime": market_regime  # 🔧 优化：添加市场环境信息
     }
 
 def get_btc_ohlcv_enhanced():
@@ -2949,35 +3891,74 @@ def check_sentiment_api_health():
     return f"正常 (成功率: {success_rate:.1f}%, 今日失败: {sentiment_api_monitor['failure_count_today']}次)"
 
 def should_execute_trade(signal_data, price_data, current_position):
-    """交易执行条件检查"""
+    """交易执行条件检查 - 重新设计：布林带极端位置是结构优化机会"""
     tech = price_data['technical_data']
     trend = price_data['trend_analysis']
     
-    # 1. RSI极端值过滤
+    # 1. RSI极端值过滤（保持原有逻辑）
     rsi = tech.get('rsi', 50)
     if rsi > 80 or rsi < 20:
         print(f"⚠️ RSI极端值({rsi:.1f})，暂停交易")
         return False
         
-    # 2. 布林带位置过滤
+    # 2. 🎯 重新设计布林带位置逻辑 - 作为结构优化信号
     bb_position = tech.get('bb_position', 0.5)
-    if bb_position > 0.85 or bb_position < 0.15:
-        print(f"⚠️ 布林带极端位置({bb_position:.2f})，暂停交易")
+    trend_score = signal_data.get('trend_score', 0)
+    primary_trend = signal_data.get('primary_trend', '')
+    
+    # 布林带位置解读
+    if bb_position < 0.1:
+        bb_signal = "触及布林带下轨 - 超卖反弹机会" if primary_trend == "强势上涨" else "突破布林带下轨 - 趋势加速"
+    elif bb_position > 0.9:
+        bb_signal = "触及布林带上轨 - 超买回落机会" if primary_trend == "强势下跌" else "突破布林带上轨 - 趋势加速"
+    elif bb_position < 0.2:
+        bb_signal = "接近布林带下轨 - 潜在支撑"
+    elif bb_position > 0.8:
+        bb_signal = "接近布林带上轨 - 潜在阻力"
+    else:
+        bb_signal = "布林带中部 - 正常波动"
+    
+    print(f"📊 布林带结构信号: 位置{bb_position:.3f} → {bb_signal}")
+    
+    # 🎯 核心逻辑：布林带极端位置是结构优化机会，不是限制条件
+    # 只有在趋势与布林带信号严重冲突时才暂停交易
+    should_pause = False
+    pause_reason = ""
+    
+    if trend_score >= 7:  # 强趋势
+        # 强趋势中，布林带极端位置是趋势加速的信号
+        if (primary_trend == "强势上涨" and bb_position < 0.1) or (primary_trend == "强势下跌" and bb_position > 0.9):
+            # 趋势方向与布林带位置严重冲突：上涨趋势中触及下轨或下跌趋势中触及上轨
+            should_pause = True
+            pause_reason = f"强趋势{primary_trend}与布林带位置{bb_position:.3f}严重冲突"
+        else:
+            # 其他情况都是正常的结构信号
+            print(f"🎯 强趋势下的布林带结构信号: {bb_signal}")
+    
+    elif trend_score >= 4:  # 中等趋势
+        # 中等趋势中，只过滤最冲突的情况
+        if (primary_trend == "强势上涨" and bb_position < 0.05) or (primary_trend == "强势下跌" and bb_position > 0.95):
+            should_pause = True
+            pause_reason = f"中等趋势{primary_trend}与布林带极度位置{bb_position:.3f}冲突"
+    
+    else:  # 弱趋势
+        # 弱趋势中，布林带极端位置可能是重要反转信号
+        if bb_position < 0.1 or bb_position > 0.9:
+            print(f"⚠️ 弱趋势+布林带极端位置{bb_position:.3f}，可能反转，谨慎交易")
+            # 不暂停，但会在仓位计算中降低仓位
+    
+    if should_pause:
+        print(f"⏸️ {pause_reason}，暂停交易")
         return False
         
-    # 3. 趋势强度检查
-    if trend.get('trend_strength') == '弱' and signal_data['confidence'] != 'HIGH':
-        print("⚠️ 弱趋势+非高信心，暂停交易")
-        return False
-        
-    # 4. 信号连续性检查
+    # 3. 信号连续性检查
     if len(signal_history) >= 2:
         last_signals = [s['signal'] for s in signal_history[-2:]]
         if signal_data['signal'] in last_signals and signal_data['confidence'] == 'LOW':
             print("⚠️ 连续低信心相同信号，暂停执行")
             return False
             
-    # 5. 持仓优化检查
+    # 4. 持仓优化检查
     if current_position:
         current_side = current_position['side']
         signal_side = 'long' if signal_data['signal'] == 'BUY' else 'short' if signal_data['signal'] == 'SELL' else None
@@ -2986,56 +3967,87 @@ def should_execute_trade(signal_data, price_data, current_position):
         if signal_side == current_side and signal_data['confidence'] == 'LOW':
             print("⚠️ 同方向低信心信号，不调整仓位")
             return False
+    
+    # 5. 🔧 新增：交易频率限制，减少频繁开仓平仓
+    if signal_data['signal'] != 'HOLD':
+        now = datetime.now()
+        current_date = now.date()
+        
+        # 检查是否是新的一天，重置每日交易计数
+        if performance_tracker.get('last_trade_date') != current_date:
+            performance_tracker['daily_trade_count'] = 0
+            performance_tracker['last_trade_date'] = current_date
+            print(f"📅 新的一天，重置每日交易计数")
+        
+        # 检查最小交易间隔（2小时）
+        last_trade_time = performance_tracker.get('last_trade_time')
+        if last_trade_time:
+            time_since_last_trade = (now - last_trade_time).total_seconds() / 3600  # 转换为小时
+            if time_since_last_trade < 2.0:
+                print(f"⏸️ 交易频率限制：距离上次交易仅{time_since_last_trade:.1f}小时，需等待至少2小时")
+                return False
+        else:
+            time_since_last_trade = 999  # 如果没有上次交易记录，允许交易
+        
+        # 检查每日最大交易次数（10笔/天）
+        daily_trade_count = performance_tracker.get('daily_trade_count', 0)
+        if daily_trade_count >= 10:
+            print(f"⏸️ 交易频率限制：今日已交易{daily_trade_count}笔，达到每日上限10笔")
+            return False
+        
+        print(f"✅ 交易频率检查通过：距离上次交易{time_since_last_trade:.1f}小时，今日已交易{daily_trade_count}笔")
             
     return True
 
 def calculate_dynamic_stop_loss(signal_data, price_data):
-    """动态止损止盈计算 - 集成智能移动止盈止损系统"""
+    """动态止损止盈计算 - 集成智能移动止盈止损系统
+    🔧 优化：根据趋势强度动态调整盈亏比，强趋势中让利润奔跑更多
+    """
     current_price = price_data['price']
     atr = price_data['technical_data'].get('atr', current_price * 0.01)
     volatility = calculate_volatility(price_data['full_data'])
     
-    # 🔧 使用三阶段保护级别确定初始止损倍数
-    # 开仓初期使用防守阶段
-    protection_level = PROTECTION_LEVELS['defensive']
-    atr_multiplier = protection_level['stop_loss_multiplier']  # 1.5
+    # 🔧 获取趋势强度，用于动态调整盈亏比
+    trend_score = signal_data.get('trend_score', 0)
     
-    # 波动性调整
+    # 🔧 根据趋势强度动态调整止损止盈倍数（核心优化）
+    if trend_score >= 8:  # 极强趋势
+        stop_loss_multiplier = 1.2  # 更紧的止损
+        take_profit_multiplier = 3.0  # 更大的止盈（风险收益比1:2.5）
+        print(f"📊 极强趋势({trend_score}/10)：止损1.2xATR，止盈3.0xATR（风险收益比1:2.5）")
+    elif trend_score >= 6:  # 强趋势
+        stop_loss_multiplier = 1.5  # 标准止损
+        take_profit_multiplier = 2.5  # 较大止盈（风险收益比1:1.67）
+        print(f"📊 强趋势({trend_score}/10)：止损1.5xATR，止盈2.5xATR（风险收益比1:1.67）")
+    else:  # 中等或弱趋势
+        stop_loss_multiplier = 1.5  # 标准止损
+        take_profit_multiplier = 2.0  # 标准止盈（风险收益比1:1.33）
+        print(f"📊 中等趋势({trend_score}/10)：止损1.5xATR，止盈2.0xATR（风险收益比1:1.33）")
+    
+    # 波动性调整（在趋势强度基础上微调）
     if volatility > 1.0:  # 高波动性
-        atr_multiplier = 2.0  # 恢复到2.0
+        stop_loss_multiplier = min(stop_loss_multiplier + 0.3, 2.0)  # 高波动时稍微放宽止损
     elif volatility < 0.3:  # 低波动性
-        atr_multiplier = 1.2  # 恢复到1.2
+        stop_loss_multiplier = max(stop_loss_multiplier - 0.2, 1.0)  # 低波动时稍微收紧止损
+    
+    atr_multiplier = stop_loss_multiplier
         
     if signal_data['signal'] == 'BUY':
         stop_loss = current_price - atr * atr_multiplier
-        # 🔧 使用DynamicTakeProfit计算动态止盈
-        dynamic_tp = DynamicTakeProfit()
-        take_profit = dynamic_tp.calculate_take_profit(
-            entry_price=current_price,
-            current_price=current_price,
-            atr=atr,
-            market_condition='normal',  # 可以从price_data获取更准确的市场条件
-            profit_pct=0  # 开仓时盈利为0
-        )
+        # 🔧 优化：根据趋势强度使用动态止盈倍数
+        take_profit = current_price + atr * take_profit_multiplier
     else:  # SELL
         stop_loss = current_price + atr * atr_multiplier
-        # 🔧 使用DynamicTakeProfit计算动态止盈
-        dynamic_tp = DynamicTakeProfit()
-        take_profit = dynamic_tp.calculate_take_profit(
-            entry_price=current_price,
-            current_price=current_price,
-            atr=atr,
-            market_condition='normal',
-            profit_pct=0
-        )
+        # 🔧 优化：根据趋势强度使用动态止盈倍数
+        take_profit = current_price - atr * take_profit_multiplier
         
-    # 确保止损合理性（修复：提高最小止损距离，避免止损过紧）
-    min_stop_distance = current_price * 0.008  # 最小0.8%（从0.5%提高到0.8%，减少频繁触发）
+    # 🔧 修复：提高最小止损距离，避免止损过紧被正常波动触发
+    min_stop_distance = current_price * 0.015  # 最小1.5%（从0.8%提高到1.5%，减少频繁触发）
     if abs(stop_loss - current_price) < min_stop_distance:
         if signal_data['signal'] == 'BUY':
-            stop_loss = current_price * 0.992  # 至少1.0%止损距离（从0.99改为0.992）
+            stop_loss = current_price * 0.985  # 至少1.5%止损距离（从0.992改为0.985）
         else:
-            stop_loss = current_price * 1.008  # 至少1.0%止损距离（从1.01改为1.008）
+            stop_loss = current_price * 1.015  # 至少1.5%止损距离（从1.008改为1.015）
     
     # 🔧 修复：确保止盈价至少覆盖手续费成本（至少0.1%）
     min_profit_distance = current_price * (TRADING_FEE_RATE + 0.0005)  # 手续费0.1% + 额外0.05%缓冲
@@ -3198,8 +4210,36 @@ def analyze_with_deepseek_trend_king(price_data):
     """
     
     # 构建强调趋势为王理念的提示词
+    bb_position = price_data['technical_data'].get('bb_position', 0)
+    
+    # 生成布林带位置的结构意义描述
+    bb_interpretation = ""
+    if bb_position < 0.1:
+        bb_interpretation = "价格触及布林带下轨，可能是超卖反弹机会"
+    elif bb_position > 0.9:
+        bb_interpretation = "价格触及布林带上轨，可能是超买回落机会"
+    elif bb_position < 0.2:
+        bb_interpretation = "价格接近布林带下轨，显示弱势"
+    elif bb_position > 0.8:
+        bb_interpretation = "价格接近布林带上轨，显示强势"
+    else:
+        bb_interpretation = "价格在布林带中部，正常波动"
+    
+    # 判断趋势与布林带结构的关系
+    structure_relation = ""
+    if technical_signal['trend_score'] >= 8:  # 🔧 更新：与新的趋势强度门槛一致
+        if (technical_signal['primary_trend'] == '强势上涨' and bb_position < 0.1) or (technical_signal['primary_trend'] == '强势下跌' and bb_position > 0.9):
+            structure_relation = "趋势加速"
+        else:
+            structure_relation = "结构确认"
+    else:
+        structure_relation = "结构确认"
+    
     prompt = f"""
+    【核心理念更新：布林带位置是结构优化信号】
+    
     你是一个严格遵循"趋势为王，结构修边"理念的专业加密货币交易员。
+    在"趋势为王，结构修边"理念中，布林带极端位置不是限制条件，而是重要的结构优化信号。
     
     【核心交易理念】
     1. 趋势为王：主要趋势决定交易方向，不要因小级别的波动或次要阻力改变大方向判断
@@ -3212,16 +4252,29 @@ def analyze_with_deepseek_trend_king(price_data):
     - 当前价格: ${price_data['price']:,.2f}
     - 价格变化: {price_data['price_change']:+.2f}%
     - RSI: {price_data['technical_data'].get('rsi', 0):.1f}
-    - 布林带位置: {price_data['technical_data'].get('bb_position', 0):.1%}
+    - 布林带位置: {bb_position:.3f}
     - MACD方向: {price_data['trend_analysis'].get('macd', 'N/A')}
     - 波动率: {calculate_volatility(price_data['full_data']):.2%}
     {sentiment_text}
     
+    【布林带位置的结构意义】
+    布林带位置{bb_position:.3f}表示：{bb_interpretation}
+    
+    【结构修边决策规则】
+    1. 顺势的布林带极端位置：趋势加速信号，应该积极跟进
+    2. 逆势的布林带极端位置：潜在反转信号，需要谨慎验证
+    3. 布林带边缘位置：正常的结构信号，按趋势方向交易
+    4. 布林带中部：无明确结构信号，主要依赖趋势判断
+    
+    【当前情况评估】
+    趋势强度: {technical_signal['trend_score']}/10 - {technical_signal['primary_trend']}
+    布林带位置: {bb_position:.3f} - 这为{technical_signal['primary_trend']}提供了{structure_relation}信号
+    
     【趋势为王决策指导原则】
-    - 强势上涨趋势(强度≥7): 坚决做多，回调是买入机会，不要因接近阻力位而过度保守
-    - 强势下跌趋势(强度≥7): 坚决做空，反弹是做空机会，不要因接近支撑位而过度保守
-    - 中等趋势(强度5-6): 可以交易，控制仓位，等待结构信号优化
-    - 弱趋势(强度<5): 观望或轻仓尝试
+    - 极强趋势(强度≥8): 坚决做多/做空，回调是买入/做空机会，不要因接近阻力位而过度保守
+    - 强趋势(强度7): 可以交易，但需等待结构信号优化
+    - 中等趋势(强度5-6): 不建议交易，等待更强趋势
+    - 弱趋势(强度<5): 坚决观望，禁止交易
     
     【结构修边时机把握原则】  
     - 有趋势 + 有结构信号 = 高信心交易，适当增加仓位
@@ -3229,15 +4282,16 @@ def analyze_with_deepseek_trend_king(price_data):
     - 无趋势 + 有结构信号 = 低信心轻仓尝试或观望
     - 无趋势 + 无结构信号 = 坚决观望
     
-    【重要】请基于"趋势为王"理念做出判断：
+    【重要】请基于"趋势为王，结构修边"理念，将布林带位置作为结构优化信号而非限制条件：
     - 当趋势明确时，次要的阻力/支撑不应成为主要HOLD理由
     - 趋势的持续性比完美的入场时机更重要
     - 宁可顺着趋势方向中等信心入场，也不要因追求完美时机而错过趋势
+    - 布林带极端位置是优化交易时机的工具，不是阻止交易的障碍
     
-    请基于以上分析给出最终交易决策：
+    你是一个专业的，富有经验的合约交易员，请仔细思考，独立判断上述数据的分析，并给出最终交易决策：
     {{
         "signal": "BUY|SELL|HOLD",
-        "reason": "详细分析理由（必须体现趋势为王理念）",
+        "reason": "详细分析理由",
         "confidence": "HIGH|MEDIUM|LOW",
         "risk_assessment": "低风险|中风险|高风险"
     }}
@@ -3275,6 +4329,22 @@ def analyze_with_deepseek_trend_king(price_data):
         signal_data['primary_trend'] = technical_signal['primary_trend']
         signal_data['structure_signals'] = technical_signal['structure_signals']
         signal_data['structure_optimized'] = technical_signal['structure_optimized']
+        
+        # 🔧 关键修复：严格执行趋势强度过滤，禁止AI覆盖技术信号的严格过滤
+        # 如果技术信号是HOLD（因为趋势强度<8），强制保持HOLD，无论AI分析如何
+        trend_score = technical_signal.get('trend_score', 0)
+        technical_signal_type = technical_signal.get('signal', 'HOLD')
+        
+        if trend_score < 8:
+            # 趋势强度<8：强制HOLD，禁止AI覆盖
+            if signal_data.get('signal') != 'HOLD':
+                print(f"🛑 强制HOLD：趋势强度{trend_score}/10 < 8，禁止AI覆盖技术信号")
+                signal_data['signal'] = 'HOLD'
+                signal_data['confidence'] = 'LOW'
+                signal_data['reason'] = f"趋势强度{trend_score}/10 < 8，严格执行趋势强度过滤（技术信号：{technical_signal_type}，AI建议被拒绝）"
+        elif technical_signal_type == 'HOLD' and trend_score >= 8:
+            # 如果技术信号是HOLD但趋势强度≥8，允许AI分析覆盖（可能是其他原因导致的HOLD）
+            print(f"✅ 趋势强度{trend_score}/10 ≥ 8，允许AI分析覆盖技术信号HOLD")
         
         # 确保有risk_assessment字段
         if 'risk_assessment' not in signal_data:
@@ -3314,12 +4384,49 @@ def execute_intelligent_trade(signal_data, price_data):
     print("🔥 开始执行交易流程...")
     print(f"📊 信号: {signal_data['signal']} | 信心: {signal_data['confidence']}")
     
-    # 显示趋势强度信息（如果存在）
-    if 'trend_score' in signal_data and 'primary_trend' in signal_data:
-        print(f"🎯 趋势: {signal_data['primary_trend']} (强度: {signal_data['trend_score']}/10)")
-    if 'structure_optimized' in signal_data and signal_data.get('structure_optimized'):
-        print(f"✨ 结构优化: 已激活")
+    # 显示趋势强度与布林带结构关系
+    trend_score = signal_data.get('trend_score', 0)
+    bb_position = price_data['technical_data'].get('bb_position', 0.5)
+    primary_trend = signal_data.get('primary_trend', '')
     
+    # 🔧 修复：根据趋势强度显示准确的趋势描述，避免误导
+    if trend_score >= 7:
+        trend_desc = "强趋势"
+    elif trend_score >= 4:
+        trend_desc = "中等趋势"
+    else:
+        trend_desc = "弱趋势"
+    
+    # 显示趋势方向和强度
+    trend_direction = primary_trend.replace("强势", "").replace("震荡", "震荡")  # 移除"强势"字样
+    print(f"🎯 趋势: {trend_direction} ({trend_desc}, 强度: {trend_score}/10)")
+    print(f"📊 布林带位置: {bb_position:.3f}")
+    
+    # 趋势与布林带结构关系评估
+    if bb_position < 0.1:
+        if primary_trend == "强势上涨":
+            structure_relation = "🚀 上涨趋势+布林带下轨 → 超卖反弹机会"
+        elif primary_trend == "强势下跌":
+            structure_relation = "📉 下跌趋势+布林带下轨 → 趋势加速确认"
+        else:
+            structure_relation = "⚠️ 震荡趋势+布林带下轨 → 潜在反转信号"
+    
+    elif bb_position > 0.9:
+        if primary_trend == "强势上涨":
+            structure_relation = "📈 上涨趋势+布林带上轨 → 趋势加速确认"
+        elif primary_trend == "强势下跌":
+            structure_relation = "🚀 下跌趋势+布林带上轨 → 超买回落机会"
+        else:
+            structure_relation = "⚠️ 震荡趋势+布林带上轨 → 潜在反转信号"
+    
+    elif bb_position < 0.2:
+        structure_relation = "📊 接近布林带下轨 → 弱势结构信号"
+    elif bb_position > 0.8:
+        structure_relation = "📊 接近布林带上轨 → 强势结构信号"
+    else:
+        structure_relation = "📈 布林带中部 → 正常结构条件"
+    
+    print(f"🔄 趋势-结构关系: {structure_relation}")
     print(f"💰 当前价格: ${price_data['price']:,.2f}")
     print("="*60)
     
@@ -3371,7 +4478,16 @@ def execute_intelligent_trade(signal_data, price_data):
         print(f"\n📋 交易决策:")
         print(f"   信号: {signal_data['signal']}")
         if 'primary_trend' in signal_data:
-            print(f"   趋势: {signal_data['primary_trend']} (强度{signal_data.get('trend_score', 0)}/10)")
+            trend_score = signal_data.get('trend_score', 0)
+            # 🔧 修复：根据趋势强度显示准确的趋势描述
+            if trend_score >= 7:
+                trend_desc = "强趋势"
+            elif trend_score >= 4:
+                trend_desc = "中等趋势"
+            else:
+                trend_desc = "弱趋势"
+            trend_direction = signal_data['primary_trend'].replace("强势", "").replace("震荡", "震荡")
+            print(f"   趋势: {trend_direction} ({trend_desc}, 强度{trend_score}/10)")
         print(f"   信心: {signal_data['confidence']}")
         print(f"   仓位: {position_size:.2f} 张")
         print(f"   杠杆: {optimal_leverage}x")
@@ -3405,6 +4521,14 @@ def execute_intelligent_trade(signal_data, price_data):
             return
             
         print("✅ 交易执行完成")
+        
+        # 🔧 新增：更新交易时间和计数（交易频率限制）
+        if signal_data['signal'] in ['BUY', 'SELL']:
+            now = datetime.now()
+            performance_tracker['last_trade_time'] = now
+            performance_tracker['daily_trade_count'] = performance_tracker.get('daily_trade_count', 0) + 1
+            print(f"📊 交易频率记录：今日已交易{performance_tracker['daily_trade_count']}笔")
+        
         time.sleep(2)
         
         # 更新持仓信息
@@ -3473,8 +4597,8 @@ def execute_buy_logic(current_position, position_size, signal_data, leverage=Non
         confidence = signal_data.get('confidence', 'MEDIUM')
         
         # 智能加仓逻辑：即使仓位差异很小，如果趋势强度>=8且信心HIGH，允许最小单位加仓
-        if abs(size_diff) < 0.01 and trend_score >= 8 and confidence == 'HIGH':
-            # 强趋势高信心，允许最小单位加仓
+        if abs(size_diff) < 0.01 and size_diff > 0 and trend_score >= 8 and confidence == 'HIGH':
+            # 强趋势高信心，允许最小单位加仓（仅在应该加仓时执行）
             min_contract = TRADE_CONFIG.get('min_amount', 0.01)
             print(f"🔥 强趋势({trend_score}/10)高信心({confidence})，执行最小单位加仓 {min_contract:.2f} 张")
             exchange.create_market_order(
@@ -3617,8 +4741,8 @@ def execute_sell_logic(current_position, position_size, signal_data, leverage=No
         confidence = signal_data.get('confidence', 'MEDIUM')
         
         # 智能加仓逻辑：即使仓位差异很小，如果趋势强度>=8且信心HIGH，允许最小单位加仓
-        if abs(size_diff) < 0.01 and trend_score >= 8 and confidence == 'HIGH':
-            # 强趋势高信心，允许最小单位加仓
+        if abs(size_diff) < 0.01 and size_diff > 0 and trend_score >= 8 and confidence == 'HIGH':
+            # 强趋势高信心，允许最小单位加仓（仅在应该加仓时执行）
             min_contract = TRADE_CONFIG.get('min_amount', 0.01)
             print(f"🔥 强趋势({trend_score}/10)高信心({confidence})，执行最小单位加仓 {min_contract:.2f} 张")
             exchange.create_market_order(
