@@ -5,6 +5,7 @@ header is rebuilt to rely on the shared signals module and centralized config.
 """
 
 import json
+import os
 import sys
 import time
 import traceback
@@ -35,11 +36,16 @@ from trading_bots.indicators import (
 )
 from trading_bots.signals import (
     calculate_dynamic_stop_loss,
+    check_sentiment_api_health,
     generate_signal_with_guidance,
     generate_trend_king_signal,
     get_sentiment_indicators,
     should_execute_trade,
 )
+
+# Constants for file paths
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DASHBOARD_DATA_FILE = os.path.join(PROJECT_ROOT, 'data/dashboard_data.json')
 
 
 class PriceMonitor:
