@@ -21,8 +21,11 @@ app.secret_key = 'crypto_deepseek_secret_key_2024'
 
 # 全局变量存储用户配置
 user_config = {}
-DASHBOARD_DATA_FILE = '/root/crypto_deepseek/data/dashboard_data.json'
-CHART_HISTORY_FILE = '/root/crypto_deepseek/data/chart_history.json'
+
+# 获取项目根目录
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+DASHBOARD_DATA_FILE = os.path.join(PROJECT_ROOT, 'data/dashboard_data.json')
+CHART_HISTORY_FILE = os.path.join(PROJECT_ROOT, 'data/chart_history.json')
 
 
 def load_dashboard_data_from_file():

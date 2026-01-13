@@ -22,10 +22,13 @@ from scripts.backtest_analyzer import BacktestAnalyzer
 # 加载环境变量
 load_dotenv()
 
+# 获取项目根目录
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 # 数据文件路径
-DATA_DIR = '/root/crypto_deepseek/data/backtest/data'
-REPORTS_DIR = '/root/crypto_deepseek/data/backtest/reports'
-CONFIGS_DIR = '/root/crypto_deepseek/data/backtest/configs'
+DATA_DIR = os.path.join(PROJECT_ROOT, 'data/backtest/data')
+REPORTS_DIR = os.path.join(PROJECT_ROOT, 'data/backtest/reports')
+CONFIGS_DIR = os.path.join(PROJECT_ROOT, 'data/backtest/configs')
 
 
 def fetch_historical_data(symbol: str = 'BTC/USDT:USDT', timeframe: str = '15m', 
@@ -121,7 +124,9 @@ def create_strategy_function():
     这个函数模拟实盘策略的核心逻辑
     """
     # 辅助：加载简易经济日历（若不存在则返回空）
-    def load_economic_calendar(filepath: str = '/root/crypto_deepseek/data/economic_calendar.json') -> List[Dict]:
+    def load_economic_calendar(filepath: str = None) -> List[Dict]:
+        if filepath is None:
+            filepath = os.path.join(PROJECT_ROOT, 'data/economic_calendar.json')
         if not os.path.exists(filepath):
             return []
         try:

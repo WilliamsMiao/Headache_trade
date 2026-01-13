@@ -7,7 +7,9 @@
 echo "🔄 安全重启交易Bot..."
 echo "========================================"
 
-cd /root/crypto_deepseek || exit 1
+# 获取脚本所在目录作为项目根目录
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PROJECT_DIR" || exit 1
 
 # 激活虚拟环境
 source venv/bin/activate
@@ -18,7 +20,8 @@ echo "📊 检查当前状态..."
 python3 -c "
 import os
 import sys
-sys.path.append('/root/crypto_deepseek/trading_bots')
+# sys.path.append(os.path.join(os.getcwd(), 'trading_bots'))
+sys.path.append(os.getcwd())
 from dotenv import load_dotenv
 import ccxt
 load_dotenv()

@@ -54,11 +54,11 @@ echo ""
 
 # 检查环境
 echo "🐍 检查 Python 环境:"
-if [[ "$CONDA_DEFAULT_ENV" == "crypto_deepseek" ]]; then
-    echo "✅ 环境正确: $CONDA_DEFAULT_ENV"
+if [[ -n "$VIRTUAL_ENV" ]]; then
+    echo "✅ 虚拟环境已激活: $(basename $VIRTUAL_ENV)"
 else
     echo "⚠️  当前环境: $CONDA_DEFAULT_ENV"
-    echo "💡 建议使用: conda activate crypto_deepseek"
+    echo "💡 建议先激活虚拟环境: source venv/bin/activate"
 fi
 
 echo ""
@@ -67,7 +67,7 @@ echo ""
 echo "📦 检查关键依赖:"
 python -c "import flask; print('✅ Flask 已安装')" 2>/dev/null || echo "❌ Flask 未安装"
 python -c "import ccxt; print('✅ CCXT 已安装')" 2>/dev/null || echo "❌ CCXT 未安装"
-python -c "from deepseek_trading_bot import exchange; print('✅ 交易服务导入成功')" 2>/dev/null || echo "❌ 交易服务导入失败"
+# python -c "from trading_bots.main_bot import TradingBot; print('✅ 交易服务导入成功')" 2>/dev/null || echo "❌ 交易服务导入失败"
 
 echo ""
 echo "=" * 50
