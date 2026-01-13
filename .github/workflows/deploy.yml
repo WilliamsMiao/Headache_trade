@@ -34,10 +34,7 @@ jobs:
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          # 如果使用密钥认证，注释掉password，启用下面的key
-          # key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # passphrase: ${{ secrets.SSH_PASSPHRASE }}  # 如果私钥有密码
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             # 显示当前信息
             echo "📍 当前用户: $(whoami)"
