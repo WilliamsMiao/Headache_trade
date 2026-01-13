@@ -1,0 +1,35 @@
+name: CI/CD Deployment
+
+on:
+  push:
+    branches: [ main ] # 仅在 main 分支更新时触发
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # 1. 切换到项目目录
+            # 注意：请确保服务器上已存在此目录并关联了 git
+            cd /root/Headache_trade-1 || exit
+            
+            # 2. 获取代码更新
+            git pull origin main
+            
+            # 3. 执行部署逻辑
+            chmod +x deploy.sh run.sh
+            ./deploy.sh
+            
+            # 4. 启动/重启系统
+            # 使用 ./run.sh 会自动停止旧进程并启动新进程
+            # 终端断开后 nohup 会保证机器人继续运行
+            ./run.sh
