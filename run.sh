@@ -66,14 +66,14 @@ mkdir -p data logs
 # 停止旧进程
 echo ""
 echo "🔄 检查并停止旧进程..."
-pkill -f "deepseek_Fluc_reduce_version.py" 2>/dev/null && echo "✓ 已停止旧的交易机器人进程"
+pkill -f "main_bot.py" 2>/dev/null && echo "✓ 已停止旧的交易机器人进程"
 pkill -f "deepseek_trading_bot.py" 2>/dev/null && echo "✓ 已停止旧的交易机器人进程"
 pkill -f "trading_dashboard.py" 2>/dev/null && echo "✓ 已停止旧的仪表板进程"
 
 # 启动交易机器人（后台运行）
 echo ""
 echo "🤖 启动交易机器人..."
-nohup python trading_bots/deepseek_Fluc_reduce_version.py > logs/bot.log 2>&1 &
+nohup python trading_bots/main_bot.py > logs/bot.log 2>&1 &
 BOT_PID=$!
 echo "✓ 交易机器人已启动 (PID: $BOT_PID)"
 echo "  日志文件: logs/bot.log"
@@ -106,7 +106,7 @@ echo "   仪表板: 当前终端"
 echo ""
 echo "🔧 管理命令:"
 echo "   查看机器人日志: tail -f logs/bot.log"
-echo "   重启机器人: pkill -f deepseek_Fluc_reduce_version.py && ./run.sh"
+echo "   重启机器人: pkill -f main_bot.py && ./run.sh"
 echo ""
 echo "⚠️  按 Ctrl+C 停止服务"
 echo "========================================"

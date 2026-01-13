@@ -27,6 +27,8 @@ class Position:
         self.leverage = leverage
         self.highest_price = entry_price  # 用于追踪最高价（做多）
         self.lowest_price = entry_price   # 用于追踪最低价（做空）
+        self.trailing_stop_price = None
+        self.trailing_activated = False
         
     def update_extreme_prices(self, high: float, low: float):
         """更新极值价格"""
@@ -34,6 +36,26 @@ class Position:
             self.highest_price = max(self.highest_price, high)
         else:
             self.lowest_price = min(self.lowest_price, low)
+
+    def update_trailing_stop(self, trailing_window: float = 0.005):
+        """根据极值价格更新移动止损，trailing_window以小数表示（0.005=0.5%）。"""
+
+        if self.side == 'long':
+            if self.highest_price <= 0:
+                return
+            candidate = self.highest_price * (1 - trailing_window)
+            if candidate <= self.entry_price:
+                return
+            self.trailing_stop_price = candidate
+        else:
+            if self.lowest_price <= 0:
+                return
+            candidate = self.lowest_price * (1 + trailing_window)
+            if candidate >= self.entry_price:
+                return
+            self.trailing_stop_price = candidate
+
+        self.trailing_activated = True
     
     def get_unrealized_pnl_pct(self, current_price: float) -> float:
         """计算未实现盈亏百分比"""
@@ -205,6 +227,20 @@ class BacktestEngine:
             # 更新持仓的极值价格
             if self.position:
                 self.position.update_extreme_prices(high_price, low_price)
+                self.position.update_trailing_stop(trailing_window=0.005)
+                # 若移动止损生成，收紧stop_loss以锁定利润
+                if self.position.trailing_stop_price:
+                    if self.position.side == 'long':
+                        self.position.stop_loss = max(
+                            self.position.stop_loss or 0,
+                            self.position.trailing_stop_price
+                        )
+                    else:
+                        # 对于空头，止损价需向下移动，取较小值
+                        self.position.stop_loss = min(
+                            self.position.stop_loss or float('inf'),
+                            self.position.trailing_stop_price
+                        )
                 
                 # 检查止损和止盈（在K线的高低价范围内检查）
                 if self.position.check_stop_loss(low_price if self.position.side == 'long' else high_price):
@@ -311,8 +347,8 @@ class BacktestEngine:
             return
         
         # 计算盈亏
-        position_value = self.position.size * price * 100  # 1张 = 0.01 BTC
-        entry_value = self.position.size * self.position.entry_price * 100
+        position_value = self.position.size * price * 0.01  # 1张 = 0.01 BTC
+        entry_value = self.position.size * self.position.entry_price * 0.01
         
         if self.position.side == 'long':
             pnl_pct = ((price - self.position.entry_price) / self.position.entry_price) * self.position.leverage

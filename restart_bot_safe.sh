@@ -53,7 +53,7 @@ echo ""
 echo "========================================"
 
 # 检查是否已有bot进程在运行
-BOT_PID=$(ps aux | grep "deepseek_Fluc_reduce_version.py" | grep -v grep | awk '{print $2}')
+BOT_PID=$(ps aux | grep "main_bot.py" | grep -v grep | awk '{print $2}')
 
 if [ -n "$BOT_PID" ]; then
     echo "⚠️  发现Bot进程正在运行 (PID: $BOT_PID)"
@@ -85,7 +85,7 @@ fi
 echo ""
 echo "🚀 启动交易Bot..."
 echo "   注意: Bot会自动检测并监控现有持仓，不会影响现有订单"
-nohup python trading_bots/deepseek_Fluc_reduce_version.py > logs/bot.log 2>&1 &
+nohup python trading_bots/main_bot.py > logs/bot.log 2>&1 &
 NEW_BOT_PID=$!
 
 # 等待初始化
@@ -104,7 +104,7 @@ if ps -p $NEW_BOT_PID > /dev/null 2>&1; then
     echo ""
     echo "💡 提示:"
     echo "   - 查看实时日志: tail -f logs/bot.log"
-    echo "   - 检查进程: ps aux | grep deepseek_Fluc"
+    echo "   - 检查进程: ps aux | grep main_bot.py"
     echo "   - Bot会自动监控现有持仓，不会平仓或取消订单"
 else
     echo "❌ Bot启动失败，请查看日志:"

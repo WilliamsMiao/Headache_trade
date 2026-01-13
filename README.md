@@ -1,211 +1,119 @@
-# Crypto DeepSeek - 智能交易系统
+# Headache Trade V2.0 - 智能交易系统
 
-基于 DeepSeek AI 的加密货币自动化交易系统，采用"趋势为王，结构修边"的交易理念，提供实时交易分析、策略执行和可视化仪表板。
+Headache Trade V2.0 是一个基于 DeepSeek AI 的高级加密货币自动化交易系统。本项目采用"趋势为王，结构修边"的核心交易理念，结合量化分析与大模型决策，提供全自动的实盘交易、策略回测及可视化的监控仪表板。
 
-## ✨ 核心特性
+## ✨ V2.0 核心特性
 
-- 🤖 **AI驱动交易决策** - 基于DeepSeek AI的智能市场分析
-- 📊 **趋势为王策略** - 量化趋势强度，动态调整仓位和风险
-- 🎯 **智能仓位管理** - 根据信心等级和趋势强度自动调整仓位大小
-- 🛡️ **动态风控系统** - 实时价格监控，自动止盈止损
-- 📈 **可视化仪表板** - 实时查看交易状态、收益曲线和交易记录
-- ⚡ **自动化执行** - 15分钟周期自动分析并执行交易
+- 🤖 **DeepSeek AI 驱动** - 集成 DeepSeek 大模型，进行深度市场情绪与趋势分析。
+- 📊 **"趋势为王" 策略引擎** - 多因子量化模型（均线系统、MACD、RSI、布林带）实时计算趋势强度。
+- 🎯 **智能动态仓位** - 基于 AI 信心指数与市场波动率（ATR）动态调整杠杆与持仓比例。
+- 🛡️ **三级风控体系** - 硬性止损、动态追踪止盈、ATR 波动保护机制。
+- 📈 **实时可视化终端** - 全新的 Web 仪表板，提供账户概览、实时日志、收益曲线及持仓监控。
+- ⚡ **自动化流水线** - 标准化 15 分钟交易周期，自动化的数据获取、清洗、分析与下单执行。
 
 ## 🚀 快速开始
 
-### 一键部署（首次使用）
+### 1. 环境准备
+确保您的系统已安装 Python 3.8+ 及 Git。
+
 ```bash
-cd /root/crypto_deepseek
+git clone <repository_url>
+cd Headache_trade-1
+```
+
+### 2. 一键部署
+运行部署脚本初始化环境及依赖：
+```bash
 ./deploy.sh
 ```
 
-### 一键启动
+### 3. 配置 API
+复制环境配置模板并填入您的 API 密钥：
 ```bash
-./run.sh
-```
-
-这将自动启动：
-- 🤖 交易机器人（后台运行）
-- 📊 Web仪表板（前台运行）
-
-### 访问界面
-- **本地**: http://localhost:5000
-- **外网**: http://your-server-ip:5000
-
-## ⚙️ 配置说明
-
-### 1. API 密钥配置
-```bash
-# 复制配置模板
 cp .env.example .env
-
-# 编辑配置文件
 nano .env
 ```
+*必需配置项：*
+- `DEEPSEEK_API_KEY`: DeepSeek 大模型接口密钥
+- `OKX_API_KEY`, `OKX_SECRET`, `OKX_PASSWORD`: OKX 交易所 V5 API
 
-需要配置的 API 密钥：
-- `DEEPSEEK_API_KEY` - DeepSeek API密钥（从 https://platform.deepseek.com/ 获取）
-- `OKX_API_KEY` - OKX交易所API密钥
-- `OKX_SECRET` - OKX交易所密钥
-- `OKX_PASSWORD` - OKX交易所密码
-- `CRYPTORACLE_API_KEY` - CryptoOracle API（可选）
-
-### 2. 系统要求
-- Python 3.8+
-- Linux 系统（推荐 Ubuntu 20.04+）
-- 网络连接（用于访问 API 和交易所）
-
-## 📁 项目结构
-
-```
-crypto_deepseek/
-├── deploy.sh                     # 一键部署脚本
-├── run.sh                        # 一键启动脚本
-├── restart_safe.sh               # 安全重启脚本
-├── .env.example                  # 环境变量配置模板
-├── .env                          # 实际配置文件（用户创建，不提交到Git）
-├── requirements.txt              # Python 依赖包
-├── README.md                     # 项目文档
-├── trading_dashboard.py          # Web 仪表板
-├── trading_bots/
-│   └── deepseek_Fluc_reduce_version.py  # 主交易机器人（趋势为王策略）
-├── templates/                    # HTML模板
-│   ├── login.html               # 登录配置页面
-│   └── arena.html              # Arena 交易界面
-├── static/                      # 静态文件
-│   ├── css/                     # CSS样式文件
-│   └── js/                      # JavaScript文件
-├── data/                        # 数据文件
-│   ├── chart_history.json       # 图表历史数据
-│   ├── dashboard_data.json      # 仪表板数据
-│   └── initial_balance.json    # 初始余额记录
-├── logs/                        # 日志文件
-│   ├── bot.log                  # 交易机器人日志
-│   └── dashboard.log            # 仪表板日志
-├── scripts/                     # 工具脚本
-│   ├── check_status.sh          # 状态检查脚本
-│   └── test_dashboard.py        # 测试工具
-└── venv/                        # Python虚拟环境
-```
-
-## 🔐 使用流程
-
-1. **部署系统**: 运行 `./deploy.sh` 完成环境配置
-2. **配置 API**: 编辑 `.env` 文件填写 API 密钥
-3. **启动系统**: 运行 `./run.sh` 启动服务
-4. **访问界面**: 浏览器打开 http://localhost:5000
-5. **配置交易**: 在登录页面填写 API 配置
-6. **开始交易**: 验证成功后进入 Arena 交易界面
-
-## 🛠️ 管理命令
-
-### 基本操作
+### 4. 启动系统
 ```bash
-# 部署系统（首次使用）
-./deploy.sh
-
-# 启动系统
 ./run.sh
+```
+启动成功后：
+- 🤖 **交易机器人**将在后台运行 (PID 记录于 `logs/bot.log`)
+- 📊 **Web 仪表板**将启动在前台，访问地址：`http://localhost:5000`
 
-# 查看交易机器人日志
-tail -f logs/bot.log
+## 📁 项目结构 (V2.0)
 
-# 检查系统状态
-./scripts/check_status.sh
+```text
+Headache_trade-1/
+├── run.sh                        # [入口] 系统一键启动脚本
+├── deploy.sh                     # [入口] 环境部署脚本
+├── restart_bot_safe.sh           # [工具] 安全重启脚本（保护现有持仓）
+├── trading_dashboard.py          # [核心] Web 可视化监控服务
+├── trading_bots/                 # [核心] 交易策略模块
+│   ├── main_bot.py               # >>> V2.0 主策咯引擎 (原 deepseek_Fluc_reduce_version)
+│   ├── risk.py                   # 风控模块
+│   └── execution.py              # 订单执行模块
+├── docs/                         # [文档] 项目文档与优化记录
+│   ├── OPTIMIZATION_SUCCESS.md   # 优化成果记录
+│   └── TRADING_PARAMETERS.md     # 交易参数说明
+├── scripts/                      # [工具] 分析与回测工具
+│   └── check_status.sh           # 进程状态检测
+├── templates/                    # [前端] Web 页面模板
+├── static/                       # [前端] 静态资源
+├── data/                         # [数据] 本地数据存储
+├── logs/                         # [日志] 运行日志目录
+└── venv/                         # Python 虚拟环境
 ```
 
-### 进程管理
-```bash
-# 停止交易机器人
-pkill -f deepseek_Fluc_reduce_version.py
+## 🛠️ 运维管理
 
-# 停止仪表板
-pkill -f trading_dashboard.py
+### 推荐操作
+- **查看实时日志**:
+  ```bash
+  tail -f logs/bot.log
+  ```
+- **安全重启 (推荐)**:
+  *并在重启前自动备份日志，且不会影响已有持仓*
+  ```bash
+  ./restart_bot_safe.sh
+  ```
 
-# 重启系统（推荐使用安全重启脚本）
-./restart_safe.sh
+### 进程控制
+- **手动停止**:
+  ```bash
+  # 停止交易机器人
+  pkill -f main_bot.py
+  
+  # 停止 Web 仪表板
+  pkill -f trading_dashboard.py
+  ```
 
-# 或手动重启
-pkill -f deepseek_Fluc_reduce_version.py && ./run.sh
-```
+## 🎯 策略详情
 
-## 📋 配置要求
+### 趋势判断标准
+系统基于 15 分钟 K 线数据，结合以下指标计算趋势评分 (0-10):
+1.  **MA 均线系统**: 多周期排列 (MA7, MA25, MA99)
+2.  **MACD**: 零轴位置与金叉/死叉状态
+3.  **RSI**: 相对强弱与背离检测
+4.  **布林带**: 价格相对位置与开口方向
 
-### 必需配置
-- DeepSeek API Key（用于 AI 分析）
-- OKX API Key / Secret / Password（用于交易）
+### 资金管理
+- **基础仓位**: 默认 10% 账户权益
+- **杠杆倍数**: 3x - 10x (动态调整)
+- **调整逻辑**: AI 信心分 > 8 且趋势分 > 7 时触发加仓；ATR 剧烈波动时自动降维。
 
-### 可选配置
-- CryptoOracle API Key（用于情绪分析，增强交易信号）
+## 🔒用于生产环境的安全建议
+1.  **Key 权限**: OKX API Key 务必仅开启 **"交易"** 与 **"读取"** 权限，**严禁开启"提币"权限**。
+2.  **IP 白名单**: 建议将 API Key 绑定服务器 IP。
+3.  **日志监控**: 定期检查 `logs/bot.log` 确保运行正常。
 
-## 🔒 安全说明
-
-⚠️ **重要提醒：**
-- `.env` 文件包含敏感信息，**绝不会**被上传到 Git
-- 所有 API 密钥从环境变量读取
-- 建议为 API 密钥设置 IP 白名单
-- 定期更换 API 密钥
-- 不要在公共场合泄露密钥
-
-## 🐛 故障排除
-
-### 常见问题
-
-1. **部署失败**
-   ```bash
-   # 检查 Python 版本
-   python3 --version
-   
-   # 手动安装依赖
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
-
-2. **启动失败**
-   ```bash
-   # 检查配置文件
-   cat .env
-   
-   # 查看错误日志
-   tail -f logs/bot.log
-   ```
-
-3. **API 连接失败**
-   - 检查网络连接
-   - 验证 API 密钥是否正确
-   - 确认 API 权限设置
-
-## 📚 技术栈
-
-- **后端**: Python 3.8+, Flask
-- **AI**: DeepSeek API（智能市场分析）
-- **交易**: OKX API (CCXT)
-- **数据**: Pandas, NumPy（技术指标计算）
-- **前端**: HTML5, CSS3, JavaScript
-- **调度**: Schedule（定时任务）
-
-## 🎯 交易策略
-
-### 趋势为王理念
-- **趋势强度量化**: 通过多周期均线、MACD、RSI等技术指标量化趋势强度（0-10分）
-- **结构修边**: 结合价格结构、布林带位置等优化入场时机
-- **智能仓位**: 根据趋势强度和AI信心等级动态调整仓位（0.5x - 1.5x）
-- **动态风控**: 基于ATR（平均真实波幅）动态设置止盈止损，实时价格监控
-
-### 交易周期
-- **分析周期**: 15分钟K线
-- **数据范围**: 24小时历史数据（96根K线）
-- **执行频率**: 每15分钟自动分析并执行交易
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📄 License
-
-MIT License
+## 📄 License & 免责声明
+本项目基于 MIT License 开源。
+**风险提示**: 加密货币交易具有极高风险，本系统提供的策略与代码仅供参考与学习，作者不对任何交易损失负责。
 
 ---
-
-🎉 **享受智能交易系统！** 📈🚀
+**Headache Trade** - *Let AI handle the headache of trading.*
