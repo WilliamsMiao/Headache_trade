@@ -11,6 +11,24 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
+      - name: Verify Secrets
+        run: |
+          if [ -z "${{ secrets.SERVER_IP }}" ]; then
+            echo "❌ ERROR: SERVER_IP secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SERVER_USER }}" ]; then
+            echo "❌ ERROR: SERVER_USER secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "❌ ERROR: SSH_PRIVATE_KEY secret is not set"
+            exit 1
+          fi
+          echo "✅ All secrets are configured"
+          echo "Server: ${{ secrets.SERVER_IP }}"
+          echo "User: ${{ secrets.SERVER_USER }}"
+
       - name: Deploy to Server via SSH
         uses: appleboy/ssh-action@master
         with:
