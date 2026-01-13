@@ -1258,6 +1258,19 @@ def trading_bot(immediate=False):
         sentiment_health = check_sentiment_api_health()
         print(f"📊 市场情绪API监控: {sentiment_health}")
 
+def setup_exchange():
+    """初始化并验证交易所连接"""
+    try:
+        print("🔌 正在连接交易所...")
+        exchange.load_markets()
+        print("✅ 交易所连接成功")
+        return True
+    except Exception as e:
+        print(f"❌ 交易所连接失败: {str(e)}")
+        # 即使连接失败（可能是网络问题），也返回True让程序继续运行，
+        # 因为exchange对象已经存在，可能会在后续恢复
+        return False
+
 def main():
     """主函数 - 集成价格监控和趋势为王策略"""
     print("🚀 BTC/USDT 趋势为王交易机器人启动")

@@ -117,6 +117,19 @@ jobs:
             
             # 3. 执行部署逻辑
             echo "🔧 执行部署脚本..."
+            
+            # 更新 .env 配置
+            echo "🔐 更新环境配置..."
+            if [ -n "${{ secrets.DEEPSEEK_API_KEY }}" ]; then
+                echo "DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}" > .env
+                echo "OKX_API_KEY=${{ secrets.OKX_API_KEY }}" >> .env
+                echo "OKX_SECRET=${{ secrets.OKX_SECRET }}" >> .env
+                echo "OKX_PASSWORD=${{ secrets.OKX_PASSWORD }}" >> .env
+                echo "✅ .env 配置已更新"
+            else
+                echo "⚠️ 警告: GitHub Secrets 中未配置 API 密钥，跳过 .env 更新"
+            fi
+            
             chmod +x deploy.sh run.sh restart_bot_safe.sh
             ./deploy.sh
             

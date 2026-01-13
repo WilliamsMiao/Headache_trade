@@ -18,8 +18,8 @@ deepseek_client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
 
 # OKX exchange setup (public endpoints still work without keys)
 OKX_API_KEY = os.getenv("OKX_API_KEY", "")
-OKX_SECRET_KEY = os.getenv("OKX_SECRET_KEY", "")
-OKX_PASSPHRASE = os.getenv("OKX_PASSPHRASE", "")
+OKX_SECRET_KEY = os.getenv("OKX_SECRET_KEY") or os.getenv("OKX_SECRET") or ""
+OKX_PASSPHRASE = os.getenv("OKX_PASSPHRASE") or os.getenv("OKX_PASSWORD") or ""
 IS_SANDBOX = os.getenv("OKX_SANDBOX", "false").lower() == "true"
 
 exchange = ccxt.okx({
