@@ -30,6 +30,7 @@ Headache Trade V2.0 是一个基于 DeepSeek AI 的高级加密货币自动化�
 为了帮助您更好地理解和使用本项目，我们提供了详细的文档：
 
 - 📖 **[用户使用手册](docs/USER_GUIDE.md)** - 从环境搭建到高阶使用的完整指南（包含命令行操作）。
+- 🚀 **[自动部署指南 (CI/CD)](DEPLOYMENT.md)** - 详细说明如何配置 GitHub Actions 实现全自动部署。
 - ⚙️ **[交易参数详解](docs/TRADING_PARAMETERS.md)** - 深入了解策略背后的各项参数设置。
 
 ## 🚀 快速开始
