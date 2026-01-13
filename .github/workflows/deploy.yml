@@ -34,20 +34,52 @@ jobs:
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          # 如果使用密钥认证，注释掉password，启用下面的key
+          # key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # passphrase: ${{ secrets.SSH_PASSPHRASE }}  # 如果私钥有密码
           script: |
-            # 1. 切换到项目目录
-            # 注意：请确保服务器上已存在此目录并关联了 git
-            cd /root/Headache_trade-1 || exit
+            # 显示当前信息
+            echo "📍 当前用户: $(whoami)"
+            echo "📍 当前目录: $(pwd)"
+            echo "📍 Home目录: $HOME"
+            
+            # 1. 确定项目目录
+            # 如果项目在其他位置，请修改这个变量
+            PROJECT_DIR="${HOME}/Headache_trade-1"
+            
+            # 检查项目目录是否存在
+            if [ ! -d "$PROJECT_DIR" ]; then
+              echo "❌ 项目目录不存在: $PROJECT_DIR"
+              echo "📍 正在搜索项目..."
+              # 尝试在常见位置查找
+              if [ -d "$HOME/Headache_trade" ]; then
+                PROJECT_DIR="$HOME/Headache_trade"
+              elif [ -d "$HOME/crypto_deepseek" ]; then
+                PROJECT_DIR="$HOME/crypto_deepseek"
+              elif [ -d "/root/Headache_trade-1" ]; then
+                PROJECT_DIR="/root/Headache_trade-1"
+              elif [ -d "/root/Headache_trade" ]; then
+                PROJECT_DIR="/root/Headache_trade"
+              else
+                echo "❌ 未找到项目目录，可用目录:"
+                ls -la $HOME/
+                exit 1
+              fi
+            fi
+            
+            echo "✅ 找到项目目录: $PROJECT_DIR"
+            cd "$PROJECT_DIR" || exit 1
             
             # 2. 获取代码更新
+            echo "📥 拉取最新代码..."
             git pull origin main
             
             # 3. 执行部署逻辑
-            chmod +x deploy.sh run.sh
+            echo "🔧 执行部署脚本..."
+            chmod +x deploy.sh run.sh restart_bot_safe.sh
             ./deploy.sh
             
-            # 4. 启动/重启系统
-            # 使用 ./run.sh 会自动停止旧进程并启动新进程
-            # 终端断开后 nohup 会保证机器人继续运行
-            ./run.sh
+            # 4. 重启系统（使用安全重启脚本）
+            echo "🔄 重启交易机器人..."
+            ./restart_bot_safe.sh
