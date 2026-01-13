@@ -97,6 +97,7 @@ if [ ! -f "trading_bots/main_bot.py" ]; then
 fi
 
 echo "   注意: Bot会自动检测并监控现有持仓，不会影响现有订单"
+export PYTHONPATH=$PYTHONPATH:$(pwd)
 nohup python3 trading_bots/main_bot.py > logs/bot.log 2>&1 &
 NEW_BOT_PID=$!
 
