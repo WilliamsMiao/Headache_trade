@@ -72,6 +72,15 @@ jobs:
             echo "📥 拉取最新代码..."
             git pull origin main
             
+            echo "📂 当前目录结构:"
+            ls -F
+            if [ -d "trading_bots" ]; then
+                echo "📂 trading_bots 目录内容:"
+                ls -F trading_bots/
+            else
+                echo "❌ 警告: trading_bots 目录不存在!"
+            fi
+            
             # 3. 执行部署逻辑
             echo "🔧 执行部署脚本..."
             chmod +x deploy.sh run.sh restart_bot_safe.sh

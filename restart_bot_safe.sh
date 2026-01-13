@@ -87,8 +87,17 @@ fi
 # 启动Bot（后台运行）
 echo ""
 echo "🚀 启动交易Bot..."
+
+if [ ! -f "trading_bots/main_bot.py" ]; then
+    echo "❌ 错误: 找不到文件 trading_bots/main_bot.py"
+    echo "   当前目录: $(pwd)"
+    echo "   目录文件:"
+    ls -F
+    exit 1
+fi
+
 echo "   注意: Bot会自动检测并监控现有持仓，不会影响现有订单"
-nohup python trading_bots/main_bot.py > logs/bot.log 2>&1 &
+nohup python3 trading_bots/main_bot.py > logs/bot.log 2>&1 &
 NEW_BOT_PID=$!
 
 # 等待初始化
