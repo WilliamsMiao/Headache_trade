@@ -70,7 +70,41 @@ jobs:
             
             # 2. 获取代码更新
             echo "📥 拉取最新代码..."
-            git pull origin main
+            # 尝试拉取代码，如果失败则尝试修复 Remote URL
+            if ! git pull origin main; then
+                echo "⚠️ Git pull (HTTPS) 失败，可能是认证问题"
+                echo "🔄 尝试切换到 SSH 协议..."
+                # 获取当前的 remote url 以备恢复
+                OLD_URL=$(git remote get-url origin)
+                
+                # 切换到 SSH
+                git remote set-url origin git@github.com:WilliamsMiao/Headache_trade.git
+                
+                if ! git pull origin main; then
+                   echo "❌ SSH 拉取也失败了"
+                   echo "🔄 恢复原来的 URL: $OLD_URL"
+                   git remote set-url origin "$OLD_URL"
+                   
+                   echo "======================================================="
+                   echo "🔴  严重错误:服务器无法从 GitHub 拉取代码！"
+                   echo "-------------------------------------------------------"
+                   echo "这就是为什么代码没有更新、依然报错的原因。"
+                   echo "服务器不仅需要运行代码，还需要有权限下载代码。"
+                   echo ""
+                   echo "请登录服务器执行以下操作之一："
+                   echo "1. 配置 SSH Key (推荐):"
+                   echo "   生成 key: ssh-keygen -t ed25519"
+                   echo "   将 ~/.ssh/id_ed25519.pub 添加到 GitHub 仓库的 Deploy Keys"
+                   echo ""
+                   echo "2. 或者手动输入一次密码保存凭证:"
+                   echo "   git config --global credential.helper store"
+                   echo "   git pull origin main (输入用户名/令牌)"
+                   echo "======================================================="
+                   exit 1
+                else
+                   echo "✅ 已成功切换到 SSH 协议并拉取了代码"
+                fi
+            fi
             
             echo "📂 当前目录结构:"
             ls -F
