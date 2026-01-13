@@ -8,7 +8,8 @@ echo "🚀 正在启动 Crypto DeepSeek 交易系统..."
 echo "========================================"
 
 # 切换到项目目录
-cd /root/crypto_deepseek || exit 1
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PROJECT_DIR" || exit 1
 
 # 检查虚拟环境
 if [ ! -d "venv" ]; then
@@ -25,7 +26,7 @@ source venv/bin/activate
 # 检查依赖
 echo ""
 echo "📦 检查依赖包..."
-if ! python -c "import ccxt, openai, flask" 2>/dev/null; then
+if ! python3 -c "import ccxt, openai, flask, pandas" 2>/dev/null; then
     echo "❌ 缺少依赖包，请先运行: ./deploy.sh"
     exit 1
 fi
@@ -73,7 +74,8 @@ pkill -f "trading_dashboard.py" 2>/dev/null && echo "✓ 已停止旧的仪表�
 # 启动交易机器人（后台运行）
 echo ""
 echo "🤖 启动交易机器人..."
-nohup python trading_bots/main_bot.py > logs/bot.log 2>&1 &
+export PYTHONPATH=$PYTHONPATH:.
+nohup python3 trading_bots/main_bot.py > logs/bot.log 2>&1 &
 BOT_PID=$!
 echo "✓ 交易机器人已启动 (PID: $BOT_PID)"
 echo "  日志文件: logs/bot.log"
@@ -91,6 +93,7 @@ fi
 
 # 启动交易仪表板（前台运行）
 echo ""
+python3 trading_dashboard.py
 echo "📊 启动交易仪表板..."
 echo "========================================"
 echo ""

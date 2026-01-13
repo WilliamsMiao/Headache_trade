@@ -88,11 +88,17 @@ mkdir -p data logs static/css static/js templates scripts
 if [ -f "run.sh" ]; then
     chmod +x run.sh
 fi
-if [ -f "restart_safe.sh" ]; then
-    chmod +x restart_safe.sh
+if [ -f "restart_bot_safe.sh" ]; then
+    chmod +x restart_bot_safe.sh
 fi
 if [ -f "scripts/check_status.sh" ]; then
     chmod +x scripts/check_status.sh
+fi
+if [ -f "scripts/analyze_backtest_results.py" ]; then
+    chmod +x scripts/analyze_backtest_results.py
+fi
+if [ -f "scripts/apply_config.py" ]; then
+    chmod +x scripts/apply_config.py
 fi
 
 echo "✓ 目录创建完成，脚本权限已设置"
