@@ -32,7 +32,6 @@ Headache Trade V2.0 是一个基于 DeepSeek AI 的高级加密货币自动化�
 
 - 📖 **[用户使用手册](docs/USER_GUIDE.md)** - 从环境搭建到高阶使用的完整指南（包含命令行操作）。
 - ⚙️ **[交易参数详解](docs/TRADING_PARAMETERS.md)** - 深入了解策略背后的各项参数设置。
-- ✅ **[优化记录与成果](docs/OPTIMIZATION_SUCCESS.md)** - 记录了系统从 V1.0 到 V2.0 的进化历程与 AI 反馈记录。
 
 ## 🚀 快速开始
 
