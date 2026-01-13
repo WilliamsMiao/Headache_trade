@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import time
 import traceback
@@ -147,44 +148,32 @@ def structure_timing_signals(df, primary_trend, config=None):
     if config:
         rsi_long_min = config.get('rsi_long_min', 60)
         rsi_short_max = config.get('rsi_short_max', 40)
-        # Note: In config, rsi_long_min is usually high (72), but here we look for dips?
-        # Re-reading original logic: "if rsi < 60: 回踩5日线买入" -> Dip buy in uptrend.
-        # So if config says rsi_long_min=72 (Strict Entry), does it mean we only buy if RSI > 72 (Momentum) or < 72 (Dip)?
-        # The AI config names are rsi_long_min/max. Usually implies "Level required to trigger".
-        # But here logic is "rsi < 60" (Dip).
-        # Let's assume config parameter 'rsi_long_min' is indeed the Dip Threshold for this specific strategy. 
-        # Actually, let's look at the config file again: "rsi_long_min": 72.0.
-        # If I change "rsi < 60" to "rsi < 72", it makes it EASIER to buy (wider range).
-        # Wait, usually Trend Follow strategies buy on strength (RSI > 50) or Pullback (RSI < 60).
-        # The AI suggested INCREASING rsi_long_min to 74 to "filter false signals".
-        # If the logic is "rsi < X", increasing X makes it looser (more signals).
-        # If the logic is "rsi > X", increasing X makes it stricter (fewer signals).
-        # Let's look at `generate_trend_king_signal` logic: `rsi_ok_buy = 45 <= rsi <= 75`.
-        # This is a range filter.
-        # `structure_timing_signals` is for "Optimization" (Timing).
-        
-        # Let's stick to using config for the Filter logic in `generate_trend_king_signal` primarily, 
-        # as that is the main gatekeeper.
-        pass
+        rsi_overbought = config.get('rsi_overbought', 55)
+        rsi_oversold = config.get('rsi_oversold', 45)
+    else:
+        rsi_long_min = float(os.getenv('RSI_LONG_MIN', 60))
+        rsi_short_max = float(os.getenv('RSI_SHORT_MAX', 40))
+        rsi_overbought = float(os.getenv('RSI_OVERBOUGHT', 55))
+        rsi_oversold = float(os.getenv('RSI_OVERSOLD', 45))
 
     if primary_trend == "强势上涨":
-        if current_price < df['sma_5'].iloc[-1] and df['rsi'].iloc[-1] < 60:
+        if current_price < df['sma_5'].iloc[-1] and df['rsi'].iloc[-1] < rsi_long_min:
             signals.append("回踩5日线买入机会")
         if current_price < df['bb_middle'].iloc[-1] and df['bb_position'].iloc[-1] < 0.4:
             signals.append("回踩布林中轨买入机会")
         if df['macd_histogram'].iloc[-1] > df['macd_histogram'].iloc[-2] and df['macd_histogram'].iloc[-2] < 0:
             signals.append("MACD绿柱放大买入机会")
-        if df['rsi'].iloc[-1] < 45 and df['rsi'].iloc[-1] > df['rsi'].iloc[-2]:
+        if df['rsi'].iloc[-1] < rsi_oversold and df['rsi'].iloc[-1] > df['rsi'].iloc[-2]:
             signals.append("RSI超卖反弹买入机会")
 
     elif primary_trend == "强势下跌":
-        if current_price > df['sma_5'].iloc[-1] and df['rsi'].iloc[-1] > 40:
+        if current_price > df['sma_5'].iloc[-1] and df['rsi'].iloc[-1] > rsi_short_max:
             signals.append("反弹5日线做空机会")
         if current_price > df['bb_middle'].iloc[-1] and df['bb_position'].iloc[-1] > 0.6:
             signals.append("反弹布林中轨做空机会")
         if df['macd_histogram'].iloc[-1] < df['macd_histogram'].iloc[-2] and df['macd_histogram'].iloc[-2] > 0:
             signals.append("MACD红柱放大做空机会")
-        if df['rsi'].iloc[-1] > 55 and df['rsi'].iloc[-1] < df['rsi'].iloc[-2]:
+        if df['rsi'].iloc[-1] > rsi_overbought and df['rsi'].iloc[-1] < df['rsi'].iloc[-2]:
             signals.append("RSI超买回落做空机会")
         if current_price > df['sma_20'].iloc[-1] and df['rsi'].iloc[-1] > 50:
             signals.append("反弹20日线做空机会")
@@ -224,6 +213,8 @@ def generate_trend_king_signal(price_data, config=None):
     entry_threshold = 8.0
     if config:
         entry_threshold = config.get('trend_score_entry', 80) / 10.0
+    else:
+        entry_threshold = float(os.getenv('TREND_SCORE_ENTRY', 80)) / 10.0
 
     if trend_score >= entry_threshold:
         if primary_trend == "强势上涨":
@@ -241,7 +232,13 @@ def generate_trend_king_signal(price_data, config=None):
 
     filter_reason = None
 
-    if abs(funding_rate) > 0.0003:
+    funding_max = 0.0003
+    if config:
+        funding_max = config.get('funding_abs_max', 0.0003)
+    else:
+        funding_max = float(os.getenv('FUNDING_ABS_MAX', 0.0003))
+
+    if abs(funding_rate) > funding_max:
         return {
             "signal": "HOLD",
             "reason": f"资金费率过高({funding_rate:.4%})，观望",
@@ -577,18 +574,19 @@ def calculate_dynamic_stop_loss(signal_data, price_data, config=None):
             stop_loss_multiplier = config.get('sl_multiplier_low', 1.5)
             take_profit_multiplier = config.get('tp_multiplier_low', 2.0)
     else:
+        # Load from Environment if config object is missing
         if trend_score >= 8:
-            stop_loss_multiplier = 1.2
-            take_profit_multiplier = 3.0
-            print(f"📊 极强趋势({trend_score}/10)：止损1.2xATR，止盈3.0xATR（风险收益比1:2.5）")
+            stop_loss_multiplier = float(os.getenv('SL_MULTIPLIER_HIGH', 1.2))
+            take_profit_multiplier = float(os.getenv('TP_MULTIPLIER_HIGH', 3.0))
+            print(f"📊 极强趋势({trend_score}/10)：止损{stop_loss_multiplier}xATR，止盈{take_profit_multiplier}xATR")
         elif trend_score >= 6:
-            stop_loss_multiplier = 1.5
-            take_profit_multiplier = 2.5
-            print(f"📊 强趋势({trend_score}/10)：止损1.5xATR，止盈2.5xATR（风险收益比1:1.67）")
+            stop_loss_multiplier = float(os.getenv('SL_MULTIPLIER_MID', 1.5))
+            take_profit_multiplier = float(os.getenv('TP_MULTIPLIER_MID', 2.5))
+            print(f"📊 强趋势({trend_score}/10)：止损{stop_loss_multiplier}xATR，止盈{take_profit_multiplier}xATR")
         else:
-            stop_loss_multiplier = 1.5
-            take_profit_multiplier = 2.0
-            print(f"📊 中等趋势({trend_score}/10)：止损1.5xATR，止盈2.0xATR（风险收益比1:1.33）")
+            stop_loss_multiplier = float(os.getenv('SL_MULTIPLIER_LOW', 1.5))
+            take_profit_multiplier = float(os.getenv('TP_MULTIPLIER_LOW', 2.0))
+            print(f"📊 中等趋势({trend_score}/10)：止损{stop_loss_multiplier}xATR，止盈{take_profit_multiplier}xATR")
 
     if volatility > 1.0:
         stop_loss_multiplier = stop_loss_multiplier + 0.3
