@@ -35,6 +35,11 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          timeout: 900s           # allow up to 15 min for pip/npm installs
+          command_timeout: 600s   # stop if a single command hangs >10 min
+          script_stop: true       # fail fast on first command error
+          debug: true             # verbose logs to avoid“卡住”无输出
           script: |
             # 显示当前信息
             echo "📍 当前用户: $(whoami)"
