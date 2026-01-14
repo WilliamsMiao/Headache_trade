@@ -81,3 +81,7 @@ desktop.ini
 
 
 
+node_modules/
+frontend_dashboard/node_modules/
+frontend_dashboard/.next/
+package-lock.json

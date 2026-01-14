@@ -1,17 +1,26 @@
-# Headache Trade V2.0 - 智能交易系统
+# Headache Trade V2.1 - 智能交易系统
 
-Headache Trade V2.0 是一个基于 DeepSeek AI 的高级加密货币自动化交易系统。本项目采用"趋势为王，结构修边"的核心交易理念，结合量化分析与大模型决策，提供全自动的实盘交易、策略回测及可视化的监控仪表板。
+Headache Trade V2.1 是一个基于 DeepSeek AI 的高级加密货币自动化交易系统。本项目采用"趋势为王，结构修边"的核心交易理念，结合量化分析与大模型决策，提供全自动的实盘交易、策略回测及可视化的监控仪表板。
 
-## ✨ V2.0 核心特性
+## ✨ V2.1 核心特性
 
 - 🤖 **DeepSeek AI 驱动** - 集成 DeepSeek 大模型，进行深度市场情绪与趋势分析。
 - 📊 **"趋势为王" 策略引擎** - 多因子量化模型（均线系统、MACD、RSI、布林带）实时计算趋势强度。
 - 🎯 **智能动态仓位** - 基于 AI 信心指数与市场波动率（ATR）动态调整杠杆与持仓比例。
 - 🛡️ **三级风控体系** - 硬性止损、动态追踪止盈、ATR 波动保护机制。
-- 📈 **实时可视化终端** - 全新的 Web 仪表板，提供账户概览、实时日志、收益曲线及持仓监控。
+- 📈 **现代化 Web 仪表板** - 基于 Next.js + React 的全新前端，提供账户概览、实时日志、收益曲线及持仓监控，支持响应式设计。
 - ⚡ **自动化流水线** - 标准化 15 分钟交易周期，自动化的数据获取、清洗、分析与下单执行。
+- 📱 **专业级 K 线图表** - 集成高性能 K 线图表组件，实时展示订单执行情况与价格走势。
 
 ## 更新日志
+
+### V2.1 (2026-01-14)
+- 🎨 **全新前端架构**: 升级至 Next.js + TypeScript + Tailwind CSS 现代技术栈，替代旧有 Flask 前端。
+- 📊 **专业级图表组件**: 新增 `PerpKlineWithOrders` 组件，支持永续期货 K 线图表与订单执行可视化。
+- 🎯 **交易逻辑完善**: 优化持仓管理、订单执行流程，增强止损止盈的稳定性与执行效率。
+- 📱 **响应式设计**: 完全适配桌面、平板、手机等多终端，提升用户体验。
+- 🔧 **组件化架构**: 模块化的 React 组件设计，便于功能扩展与维护。
+- 📈 **增强的数据展示**: 新增仪表板页面、加密货币行情条、实时订单状态展示。
 
 ### V2.0 (2026-01-13)
 - 🚀 **全新AI优化引擎**: 集成DeepSeek AI进行策略参数优化，通过多轮迭代回测提升胜率和盈亏比。
@@ -67,31 +76,78 @@ nano .env
 - 🤖 **交易机器人**将在后台运行 (PID 记录于 `logs/bot.log`)
 - 📊 **Web 仪表板**将启动在前台，访问地址：`http://localhost:5000`
 
-## 📁 项目结构 (V2.0)
+## 📁 项目结构 (V2.1)
 
 ```text
 Headache_trade-1/
 ├── run.sh                        # [入口] 系统一键启动脚本
 ├── deploy.sh                     # [入口] 环境部署脚本
 ├── restart_bot_safe.sh           # [工具] 安全重启脚本（保护现有持仓）
-├── trading_dashboard.py          # [核心] Web 可视化监控服务
+├── trading_dashboard.py          # [后端] Python Web API 服务
 ├── trading_bots/                 # [核心] 交易策略模块
-│   ├── main_bot.py               # >>> V2.0 主策咯引擎 (原 deepseek_Fluc_reduce_version)
-│   ├── risk.py                   # 风控模块
-│   └── execution.py              # 订单执行模块
+│   ├── main_bot.py               # >>> V2.1 主策略引擎 (优化的交易执行逻辑)
+│   ├── risk.py                   # 完善的风控模块
+│   ├── execution.py              # 增强的订单执行模块
+│   ├── ai_commander.py           # AI 决策引擎
+│   ├── signals.py                # 信号生成模块
+│   └── indicators.py             # 技术指标计算
+├── frontend_dashboard/           # [新] 现代化 Next.js 前端应用
+│   ├── app/                      # Next.js 应用目录
+│   │   ├── page.tsx              # 主页面
+│   │   ├── layout.tsx            # 全局布局
+│   │   └── dashboard/            # 交易仪表板页面
+│   ├── components/               # React 组件库
+│   │   ├── charts/               # 图表组件（K线、收益曲线等）
+│   │   │   └── PerpKlineWithOrders.tsx  # 永续K线与订单展示
+│   │   ├── dashboard/            # 仪表板组件
+│   │   └── ui/                   # UI 基础组件
+│   ├── lib/                      # 工具函数与 API 客户端
+│   │   ├── api.ts                # 后端 API 调用
+│   │   └── utils.ts              # 辅助函数
+│   └── package.json              # Node.js 依赖配置
 ├── docs/                         # [文档] 项目文档与优化记录
 │   ├── OPTIMIZATION_SUCCESS.md   # 优化成果记录
-│   └── TRADING_PARAMETERS.md     # 交易参数说明
+│   ├── TRADING_PARAMETERS.md     # 交易参数说明
+│   └── USER_GUIDE.md             # 用户使用指南
 ├── scripts/                      # [工具] 分析与回测工具
 │   ├── analyze_backtest_results.py # 自动分析回测数据并汇总结果报告
-│   ├── apply_config.py           # 一键应用最佳回测参数至实盘配置文件 (.env)
+│   ├── apply_config.py           # 一键应用最佳回测参数至实盘配置
+│   ├── backtest_engine.py        # 回测引擎
+│   ├── backtest_runner.py        # 回测运行器
 │   └── check_status.sh           # 进程状态检测
-├── templates/                    # [前端] Web 页面模板
-├── static/                       # [前端] 静态资源
 ├── data/                         # [数据] 本地数据存储
+│   ├── backtest_summary.csv      # 回测汇总报告
+│   ├── dashboard_data.json       # 仪表板数据
+│   ├── guidance.json             # 交易指导数据
+│   ├── chart_history.json        # K线历史数据
+│   └── backtest/                 # 回测结果存储
 ├── logs/                         # [日志] 运行日志目录
+├── requirements.txt              # Python 依赖配置
+├── README.md                     # 项目说明文档
 └── venv/                         # Python 虚拟环境
 ```
+
+## 🎨 前端仪表板 (V2.1 新增)
+
+### 技术栈
+- **框架**: Next.js 15 + React 18
+- **样式**: Tailwind CSS + PostCSS
+- **类型**: TypeScript
+- **图表**: 自定义高性能 K 线组件
+
+### 主要功能
+1. **实时行情展示** - 加密货币行情条，实时更新币种价格与涨跌幅
+2. **交易仪表板** - 账户总资产、收益、持仓列表、风险指标一览
+3. **K 线图表与订单** - 支持永续期货 K 线实时展示与订单执行标记
+4. **交易日志** - 实时展示机器人的交易信号、执行情况、风控事件
+
+### 启动前端
+```bash
+cd frontend_dashboard
+npm install
+npm run dev
+```
+前端将在 `http://localhost:3000` 启动
 
 ## 🛠️ 运维管理
 

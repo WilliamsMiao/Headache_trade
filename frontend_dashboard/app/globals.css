@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* 数据字段悬停高亮：轻微提亮+上浮+辉光 */
+  .hover-data {
+    @apply transition duration-150 ease-out hover:text-white hover:brightness-125 hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(59,130,246,0.35)];
+  }
+  /* 标签/徽章悬停高亮 */
+  .hover-chip {
+    @apply transition duration-150 ease-out hover:brightness-125 hover:-translate-y-[1px] hover:ring-2 hover:ring-blue-500/40 hover:ring-offset-2 hover:ring-offset-slate-900;
+  }
+
+  /* 数据刷新高亮动画：根据涨跌闪烁 */
+  .flash-green {
+    --flash-base: currentColor;
+    animation: flash-green 0.85s ease-out both;
+  }
+  .flash-red {
+    --flash-base: currentColor;
+    animation: flash-red 0.85s ease-out both;
+  }
+}
+
+@keyframes flash-green {
+  0% { text-shadow: 0 0 12px currentColor; }
+  40% { text-shadow: 0 0 8px currentColor; }
+  70% { text-shadow: 0 0 4px currentColor; }
+  100% { text-shadow: none; }
+}
+
+@keyframes flash-red {
+  0% { text-shadow: 0 0 12px currentColor; }
+  40% { text-shadow: 0 0 8px currentColor; }
+  70% { text-shadow: 0 0 4px currentColor; }
+  100% { text-shadow: none; }
+}
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 2, 6, 23; /* slate-950 */
+  --background-end-rgb: 2, 6, 23;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+/* Custom Scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

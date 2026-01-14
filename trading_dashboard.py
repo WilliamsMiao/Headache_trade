@@ -261,8 +261,12 @@ def background_updater():
 
 @app.route('/')
 def index():
-    """主页面 - 直接显示arena界面"""
-    return render_template('arena.html')
+    """主页面 - 简单健康检查或重定向提示"""
+    return jsonify({
+        'service': 'Headache Trade Dashboard API',
+        'status': 'ok',
+        'endpoints': ['/api/dashboard', '/api/positions', '/api/trades', '/api/signals', '/api/chart-history'],
+    })
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
