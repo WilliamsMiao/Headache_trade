@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { TradingParameters, BacktestJob, ConfigHistoryEntry, LogEntry } from "@/types/api";
@@ -145,7 +146,15 @@ export default function ControlCenterPage() {
           <p className="text-sm uppercase tracking-[0.2em] text-blue-400">Control Center</p>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <h1 className="text-2xl md:text-3xl font-bold text-white">交易参数 · 回测 · 日志</h1>
-            <div className="text-sm text-slate-400">实时参数总览 · 一键回测（可选AI反思迭代） · 日志监控</div>
+            <div className="flex items-center gap-3 text-sm text-slate-400">
+              <div>实时参数总览 · 一键回测（可选AI反思迭代） · 日志监控</div>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-100 hover:border-blue-500 hover:text-white transition"
+              >
+                ← 返回主面板
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -272,6 +281,15 @@ export default function ControlCenterPage() {
               </button>
             </div>
           </div>
+
+          {(backtestMutation.isPending || lastJob?.status === "running") && (
+            <div className="mt-4 bg-slate-900 border border-slate-800 rounded-lg p-3 flex items-center gap-3">
+              <div className="relative w-32 h-2 overflow-hidden rounded-full bg-slate-800">
+                <div className="absolute inset-y-0 left-0 w-2/3 bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-500 animate-pulse" />
+              </div>
+              <div className="text-sm text-slate-200">回测运行中，正在计算绩效...</div>
+            </div>
+          )}
 
           {lastJob && (
             <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">

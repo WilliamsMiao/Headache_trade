@@ -57,7 +57,7 @@ export default function Header() {
 
          <Link
            href="/dashboard/control"
-           className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition"
+           className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-100 hover:border-blue-500 hover:text-white transition text-sm font-semibold"
          >
            控制中心
          </Link>
