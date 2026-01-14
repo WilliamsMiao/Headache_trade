@@ -75,14 +75,8 @@ else
     echo "ℹ️  未发现运行中的Bot进程"
 fi
 
-# 检查 Dashboard 进程
-DASH_PID=$(ps aux | grep "trading_dashboard.py" | grep -v grep | awk '{print $2}')
-if [ -n "$DASH_PID" ]; then
-    echo "ℹ️  Dashboard 进程正在运行 (PID: $DASH_PID)，不进行重启"
-else
-    echo "⚠️  未发现 Dashboard 进程，准备启动..."
-    export START_DASHBOARD=true
-fi
+# 注意：此脚本只重启交易Bot，不管理Web界面
+# 如需启动Web界面，请使用: ./start_services.sh
 
 
 # 备份日志
@@ -124,19 +118,17 @@ if ps -p $NEW_BOT_PID > /dev/null 2>&1; then
     echo ""
     echo "========================================"
 
-    # 如果需要启动仪表板
-    if [ "$START_DASHBOARD" = "true" ]; then
-        echo "🚀 启动 Monitor Dashboard..."
-        nohup python3 trading_dashboard.py > logs/dashboard.log 2>&1 &
-        echo "✅ Dashboard 已启动"
-    fi
-
     echo "✅ 重启完成！"
     echo ""
     echo "💡 提示:"
     echo "   - 查看实时日志: tail -f logs/bot.log"
     echo "   - 检查进程: ps aux | grep main_bot.py"
     echo "   - Bot会自动监控现有持仓，不会平仓或取消订单"
+    echo ""
+    echo "📊 Web界面管理:"
+    echo "   - 启动前后端: ./start_services.sh"
+    echo "   - 前端访问: http://localhost:3000"
+    echo "   - 后端API: http://localhost:5001"
 else
     echo "❌ Bot启动失败，请查看日志:"
     tail -n 20 logs/bot.log

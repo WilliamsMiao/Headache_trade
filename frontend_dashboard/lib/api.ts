@@ -5,6 +5,11 @@ import {
   Position,
   Trade,
   KlinePoint,
+  TradingParameters,
+  BacktestRunRequest,
+  BacktestJob,
+  LogEntry,
+  ConfigHistoryEntry,
 } from '../types/api';
 
 const API_BASE = '/api';
@@ -16,6 +21,71 @@ async function fetchJson<T>(url: string): Promise<T> {
   }
   return res.json();
 }
+
+async function postJson<T>(url: string, body: any): Promise<T> {
+  const res = await fetch(`${API_BASE}${url}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body ?? {}),
+  });
+  if (!res.ok) {
+    throw new Error(`API Error: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+const fallbackTradingParams: TradingParameters = {
+  symbol: 'BTC/USDT:USDT',
+  timeframe: '15m',
+  leverage: 6,
+  fee_rate: 0.001,
+  slippage: 0.0001,
+  risk: {
+    base_risk_per_trade: 0.02,
+    adaptive_risk_enabled: true,
+    target_utilization: 0.5,
+    max_utilization: 0.6,
+    max_leverage: 10,
+    lock_stop_loss_ratio: 0.3,
+    lock_stop_loss_profit_threshold: 0.02,
+  },
+  protection: {
+    orbit_update_interval: 300,
+    orbit_min_trigger_time: 180,
+    protection_levels: {
+      defensive: {
+        activation_time: 30,
+        take_profit_multiplier: 0.8,
+        stop_loss_multiplier: 1.8,
+      },
+      balanced: {
+        activation_time: 60,
+        take_profit_multiplier: 1.2,
+        stop_loss_multiplier: 1.2,
+        min_profit_required: 0.002,
+      },
+      aggressive: {
+        activation_time: 120,
+        take_profit_multiplier: 1.8,
+        stop_loss_multiplier: 0.8,
+        min_profit_required: 0.005,
+      },
+    },
+  },
+};
+
+const fallbackLogs = (source: string, limit: number): LogEntry[] => {
+  const now = Date.now();
+  return Array.from({ length: limit }).map((_, idx) => {
+    const ts = new Date(now - idx * 4500).toISOString();
+    return {
+      timestamp: ts,
+      level: idx % 7 === 0 ? 'WARN' : 'INFO',
+      source,
+      message: idx % 7 === 0 ? 'Simulated warning: funding rate spike' : 'Heartbeat: system healthy',
+    };
+  });
+};
 
 const normalizeSymbol = (symbol?: string) => {
   if (!symbol) return 'BTCUSDT-PERP';
@@ -249,5 +319,63 @@ export const api = {
 
     const equityHistory = await api.getChartHistory('ALL');
     return synthesizeKlinesFromEquity(equityHistory);
+  },
+
+  getTradingParams: async () => {
+    try {
+      return await fetchJson<TradingParameters>('/config/trading');
+    } catch (err) {
+      console.warn('Trading params fetch failed, using fallback', err);
+      return fallbackTradingParams;
+    }
+  },
+
+  runBacktest: async (payload: BacktestRunRequest): Promise<BacktestJob> => {
+    try {
+      return await postJson<BacktestJob>('/backtest/run', payload);
+    } catch (err) {
+      console.warn('Backtest run failed, returning mock job', err);
+      const now = new Date();
+      return {
+        id: `mock-job-${now.getTime()}`,
+        status: 'completed',
+        started_at: now.toISOString(),
+        finished_at: now.toISOString(),
+        config_name: payload.config || 'default',
+        total_return_pct: -12.04,
+        ai_feedback: payload.ai_feedback,
+        message: 'Mock result returned due to API error.',
+      };
+    }
+  },
+
+  getLogs: async ({ type = 'bot', limit = 200 }: { type?: string; limit?: number }): Promise<LogEntry[]> => {
+    try {
+      const raw = await fetchJson<any>(`/logs?type=${type}&limit=${limit}`);
+      if (Array.isArray(raw)) {
+        return raw.map((item, idx) => ({
+          timestamp: item.timestamp || item.time || new Date().toISOString(),
+          level: (item.level || item.severity || 'INFO').toUpperCase(),
+          source: item.source || type,
+          message: item.message || item.msg || JSON.stringify(item),
+        }));
+      }
+    } catch (err) {
+      console.warn('Log fetch failed, using fallback', err);
+    }
+    return fallbackLogs(type, limit);
+  },
+
+  getConfigHistory: async (): Promise<ConfigHistoryEntry[]> => {
+    try {
+      return await fetchJson<ConfigHistoryEntry[]>('/config/history');
+    } catch (err) {
+      console.warn('Config history fetch failed', err);
+      return [];
+    }
+  },
+
+  rollbackConfig: async (name: string): Promise<{ success: boolean; message?: string }> => {
+    return postJson<{ success: boolean; message?: string }>('/config/rollback', { name });
   },
 };

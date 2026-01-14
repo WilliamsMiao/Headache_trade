@@ -69,7 +69,10 @@ echo ""
 echo "🔄 检查并停止旧进程..."
 pkill -f "main_bot.py" 2>/dev/null && echo "✓ 已停止旧的交易机器人进程"
 pkill -f "deepseek_trading_bot.py" 2>/dev/null && echo "✓ 已停止旧的交易机器人进程"
-pkill -f "trading_dashboard.py" 2>/dev/null && echo "✓ 已停止旧的仪表板进程"
+
+echo ""
+echo "ℹ️  注意: 此脚本只启动交易Bot"
+echo "   如需Web界面，请运行: ./start_services.sh"
 
 # 启动交易机器人（后台运行）
 echo ""
@@ -91,27 +94,25 @@ if ! ps -p $BOT_PID > /dev/null; then
     exit 1
 fi
 
-# 启动交易仪表板（前台运行）
 echo ""
-python3 trading_dashboard.py
-echo "📊 启动交易仪表板..."
 echo "========================================"
-echo ""
-echo "✅ 系统启动成功！"
-echo ""
-echo "📍 访问地址:"
-echo "   本地: http://localhost:5000"
-echo "   外网: http://$(curl -s ifconfig.me 2>/dev/null || echo 'your-server-ip'):5000"
+echo "✅ 交易Bot启动成功！"
+echo "========================================"
 echo ""
 echo "📂 日志文件:"
 echo "   交易机器人: logs/bot.log"
-echo "   仪表板: 当前终端"
 echo ""
 echo "🔧 管理命令:"
-echo "   查看机器人日志: tail -f logs/bot.log"
-echo "   重启机器人: pkill -f main_bot.py && ./run.sh"
+echo "   查看实时日志: tail -f logs/bot.log"
+echo "   安全重启Bot: ./restart_bot_safe.sh"
+echo "   停止Bot: pkill -f main_bot.py"
 echo ""
-echo "⚠️  按 Ctrl+C 停止服务"
+echo "📊 启动Web界面 (可选):"
+echo "   ./start_services.sh"
+echo "   前端访问: http://localhost:3000"
+echo "   后端API: http://localhost:5001"
+echo ""
+echo "⚠️  按 Ctrl+C 停止Bot"
 echo "========================================"
 echo ""
 
@@ -123,16 +124,19 @@ cleanup() {
     sleep 2
     # 强制杀死如果还在运行
     kill -9 $BOT_PID 2>/dev/null
-    echo "✓ 系统已完全停止"
+    echo "✓ 交易Bot已停止"
     exit 0
 }
 
 # 捕获 Ctrl+C 信号
 trap cleanup SIGINT SIGTERM
 
-# 启动仪表板
-python trading_dashboard.py
+# 保持脚本运行，等待信号
+echo "Bot正在后台运行...按 Ctrl+C 停止"
+while ps -p $BOT_PID > /dev/null 2>&1; do
+    sleep 5
+done
 
-# 如果仪表板退出，停止机器人
+echo "⚠️  Bot进程意外退出，请查看日志"
 cleanup
 

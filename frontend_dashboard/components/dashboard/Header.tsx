@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
@@ -53,6 +54,13 @@ export default function Header() {
             <p>Last Update</p>
             <p className="font-mono text-slate-300">{data?.last_update?.split(' ')[1] || '--:--:--'}</p>
          </div>
+
+         <Link
+           href="/dashboard/control"
+           className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition"
+         >
+           控制中心
+         </Link>
       </div>
     </header>
   );

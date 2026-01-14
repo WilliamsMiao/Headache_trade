@@ -8,12 +8,19 @@ import os
 import json
 import time
 import threading
+import uuid
+import subprocess
+import sys
+import multiprocessing
+from pathlib import Path
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, Response
 from flask_cors import CORS
 import pandas as pd
 from dotenv import load_dotenv
 import fcntl
+
+from trading_bots import config as bot_config
 
 app = Flask(__name__)
 CORS(app)
@@ -26,6 +33,19 @@ user_config = {}
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 DASHBOARD_DATA_FILE = os.path.join(PROJECT_ROOT, 'data/dashboard_data.json')
 CHART_HISTORY_FILE = os.path.join(PROJECT_ROOT, 'data/chart_history.json')
+
+CONFIG_BACKUP_DIR = Path(PROJECT_ROOT) / 'data' / 'backtest' / 'configs'
+CURRENT_CONFIG_FILE = CONFIG_BACKUP_DIR / 'current_trading_params.json'
+LOG_DIR = Path(PROJECT_ROOT) / 'logs'
+LOG_FILES = {
+    'bot': LOG_DIR / 'bot.log',
+    'dashboard': LOG_DIR / 'dashboard.log',
+    'commander': LOG_DIR / 'commander.log',
+    'backtest': LOG_DIR / 'backtest.log',
+}
+
+backtest_jobs = {}
+backtest_jobs_lock = threading.Lock()
 
 
 def load_dashboard_data_from_file():
@@ -102,6 +122,161 @@ def validate_api_keys(config):
     except Exception as e:
         print(f"API密钥验证失败: {e}")
         return False
+
+
+def serialize_trading_params():
+    cfg = bot_config.TRADE_CONFIG
+    return {
+        'symbol': cfg.get('symbol'),
+        'timeframe': cfg.get('timeframe'),
+        'leverage': cfg.get('leverage'),
+        'fee_rate': bot_config.TRADING_FEE_RATE,
+        'slippage': float(os.getenv('BOT_SLIPPAGE', '0.0001')),
+        'risk': {
+            'base_risk_per_trade': cfg['risk_management'].get('base_risk_per_trade'),
+            'adaptive_risk_enabled': cfg['risk_management'].get('adaptive_risk_enabled', True),
+            'target_utilization': cfg['risk_management'].get('target_capital_utilization'),
+            'max_utilization': cfg['risk_management'].get('max_capital_utilization'),
+            'max_leverage': cfg['risk_management'].get('max_leverage'),
+            'lock_stop_loss_ratio': bot_config.LOCK_STOP_LOSS_RATIO,
+            'lock_stop_loss_profit_threshold': bot_config.LOCK_STOP_LOSS_PROFIT_THRESHOLD / 100 if bot_config.LOCK_STOP_LOSS_PROFIT_THRESHOLD > 1 else bot_config.LOCK_STOP_LOSS_PROFIT_THRESHOLD,
+        },
+        'protection': {
+            'orbit_update_interval': bot_config.ORBIT_UPDATE_INTERVAL,
+            'orbit_min_trigger_time': bot_config.ORBIT_MIN_TRIGGER_TIME,
+            'protection_levels': bot_config.PROTECTION_LEVELS,
+        },
+        'updated_at': datetime.utcnow().isoformat() + 'Z',
+    }
+
+
+def load_trading_params():
+    if CURRENT_CONFIG_FILE.exists():
+        try:
+            with CURRENT_CONFIG_FILE.open('r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as exc:
+            print(f"⚠️ 读取当前配置失败，使用默认: {exc}")
+    return serialize_trading_params()
+
+
+def backup_trading_params(snapshot=None):
+    CONFIG_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    payload = snapshot or load_trading_params()
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_path = CONFIG_BACKUP_DIR / f"trading_params_{ts}.json"
+    with backup_path.open('w', encoding='utf-8') as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    return backup_path
+
+
+def save_trading_params(new_params):
+    backup_trading_params()
+    CONFIG_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    with CURRENT_CONFIG_FILE.open('w', encoding='utf-8') as f:
+        payload = {**new_params, 'updated_at': datetime.utcnow().isoformat() + 'Z'}
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    return payload
+
+
+def list_config_history():
+    entries = []
+    if not CONFIG_BACKUP_DIR.exists():
+        return entries
+    for p in CONFIG_BACKUP_DIR.glob('trading_params_*.json'):
+        entries.append({
+            'name': p.name,
+            'path': str(p.relative_to(PROJECT_ROOT)),
+            'timestamp': p.stat().st_mtime,
+            'size': p.stat().st_size,
+        })
+    entries.sort(key=lambda x: x['timestamp'], reverse=True)
+    for item in entries:
+        item['timestamp'] = datetime.fromtimestamp(item['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+    return entries
+
+
+def rollback_config(name: str):
+    target = CONFIG_BACKUP_DIR / name
+    if not target.exists():
+        raise FileNotFoundError(f"未找到备份: {name}")
+    with target.open('r', encoding='utf-8') as f:
+        payload = json.load(f)
+    with CURRENT_CONFIG_FILE.open('w', encoding='utf-8') as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    return payload
+
+
+def tail_log(path: Path, limit: int = 200):
+    if not path.exists():
+        return []
+    with path.open('r', encoding='utf-8', errors='ignore') as f:
+        lines = f.readlines()
+    return lines[-limit:]
+
+
+def log_stream_generator(path: Path, log_type: str, poll_seconds: float = 1.0):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.touch()
+    with path.open('r', encoding='utf-8', errors='ignore') as f:
+        f.seek(0, os.SEEK_END)
+        while True:
+            line = f.readline()
+            if line:
+                payload = json.dumps({
+                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'level': 'INFO',
+                    'source': log_type,
+                    'message': line.strip(),
+                })
+                yield f"data: {payload}\n\n"
+            else:
+                time.sleep(poll_seconds)
+
+
+def run_backtest_job(job_id: str, payload: dict):
+    with backtest_jobs_lock:
+        backtest_jobs[job_id] = {
+            'id': job_id,
+            'status': 'running',
+            'started_at': datetime.utcnow().isoformat() + 'Z',
+            'ai_feedback': bool(payload.get('ai_feedback', False)),
+            'config_name': payload.get('config') or 'default',
+        }
+
+    log_path = LOG_FILES.get('backtest')
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [sys.executable, os.path.join(PROJECT_ROOT, 'scripts', 'backtest_runner.py'), '--days', str(payload.get('days', 30))]
+    if payload.get('config'):
+        cmd += ['--config', str(payload['config'])]
+
+    env = os.environ.copy()
+    if payload.get('initial_balance'):
+        env['BACKTEST_INITIAL_BALANCE'] = str(payload['initial_balance'])
+    if payload.get('leverage'):
+        env['BACKTEST_LEVERAGE'] = str(payload['leverage'])
+
+    try:
+        with log_path.open('a', encoding='utf-8') as lf:
+            lf.write(f"\n[{datetime.utcnow().isoformat()}Z] job {job_id} start cmd: {' '.join(cmd)}\n")
+            proc = subprocess.run(cmd, cwd=PROJECT_ROOT, env=env, stdout=lf, stderr=lf, text=True)
+        status = 'completed' if proc.returncode == 0 else 'failed'
+        with backtest_jobs_lock:
+            backtest_jobs[job_id] = {
+                **backtest_jobs.get(job_id, {}),
+                'status': status,
+                'finished_at': datetime.utcnow().isoformat() + 'Z',
+                'message': f'return code {proc.returncode}',
+            }
+    except Exception as exc:
+        with backtest_jobs_lock:
+            backtest_jobs[job_id] = {
+                **backtest_jobs.get(job_id, {}),
+                'status': 'failed',
+                'finished_at': datetime.utcnow().isoformat() + 'Z',
+                'message': str(exc),
+            }
 
 
 # 全局数据存储
@@ -385,6 +560,98 @@ def get_chart_history():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/config/trading', methods=['GET', 'POST'])
+def trading_config_api():
+    try:
+        if request.method == 'GET':
+            return jsonify(load_trading_params())
+
+        payload = request.get_json() or {}
+        saved = save_trading_params(payload)
+        return jsonify({'success': True, 'data': saved})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/config/history', methods=['GET'])
+def trading_config_history():
+    try:
+        return jsonify(list_config_history())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/config/rollback', methods=['POST'])
+def trading_config_rollback():
+    try:
+        body = request.get_json() or {}
+        name = body.get('name')
+        if not name:
+            return jsonify({'error': 'name required'}), 400
+        payload = rollback_config(name)
+        return jsonify({'success': True, 'data': payload})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/backtest/run', methods=['POST'])
+def run_backtest_api():
+    try:
+        body = request.get_json() or {}
+        job_id = str(uuid.uuid4())
+        with backtest_jobs_lock:
+            backtest_jobs[job_id] = {
+                'id': job_id,
+                'status': 'queued',
+                'ai_feedback': bool(body.get('ai_feedback', False)),
+                'config_name': body.get('config') or 'default',
+            }
+        t = threading.Thread(target=run_backtest_job, args=(job_id, body), daemon=True)
+        t.start()
+        with backtest_jobs_lock:
+            return jsonify(backtest_jobs[job_id])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/backtest/status/<job_id>', methods=['GET'])
+def backtest_status(job_id):
+    try:
+        if job_id not in backtest_jobs:
+            return jsonify({'error': 'job not found'}), 404
+        with backtest_jobs_lock:
+            return jsonify(backtest_jobs[job_id])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/logs', methods=['GET'])
+def get_logs_api():
+    try:
+        log_type = request.args.get('type', 'bot')
+        limit = int(request.args.get('limit', '200'))
+        path = LOG_FILES.get(log_type, LOG_FILES['bot'])
+        lines = tail_log(path, limit)
+        entries = []
+        for line in lines:
+            entries.append({
+                'timestamp': datetime.utcnow().isoformat() + 'Z',
+                'level': 'INFO',
+                'source': log_type,
+                'message': line.strip(),
+            })
+        return jsonify(entries)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/logs/stream')
+def stream_logs():
+    log_type = request.args.get('type', 'bot')
+    path = LOG_FILES.get(log_type, LOG_FILES['bot'])
+    return Response(log_stream_generator(path, log_type), mimetype='text/event-stream')
 
 @app.route('/api/save-chart-history', methods=['POST'])
 def save_chart_history():
