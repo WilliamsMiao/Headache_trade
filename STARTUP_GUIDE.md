@@ -165,6 +165,33 @@ kill -9 <PID>
 ### Q4: 忘记哪个脚本是干什么的？
 看本文档最上方的 **脚本用途一览表** 😊
 
+### Q5: 在服务器上启动了但无法通过公网访问前端？
+```bash
+# 1. 确认服务运行中
+ps aux | grep -E "(trading_dashboard|next dev)" | grep -v grep
+
+# 2. 确认端口监听
+netstat -tlnp | grep -E "(3000|5001)"
+
+# 3. 检查防火墙（以 iptables 为例）
+sudo iptables -L -n | grep -E "(3000|5001)"
+
+# 4. 开放端口（如需要）
+sudo ufw allow 3000/tcp
+sudo ufw allow 5001/tcp
+
+# 5. 查看前端日志找到具体错误
+tail -f logs/frontend.log
+
+# 6. 如果提示 "next: not found"，说明前端依赖未安装
+cd frontend_dashboard && npm install && cd ..
+```
+
+**云服务商配置** (阿里云/腾讯云/AWS等):
+- 进入安全组/防火墙设置
+- 添加入站规则：允许端口 3000 和 5001
+- 使用**公网IP**而不是localhost访问
+
 ---
 
 ## 🎓 推荐启动顺序
