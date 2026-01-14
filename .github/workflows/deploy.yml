@@ -70,9 +70,14 @@ jobs:
             
             # 2. 获取代码更新
             echo "📥 拉取最新代码..."
-            # 尝试拉取代码，如果失败则尝试修复 Remote URL
-            if ! git pull origin main; then
-                echo "⚠️ Git pull (HTTPS) 失败，可能是认证问题"
+            
+            # 配置 git 以处理强制推送导致的分歧分支
+            git config pull.ff only 2>/dev/null || true
+            
+            # 使用 fetch + reset 方式而不是 pull，更加可靠
+            # 这样可以处理强制推送（git push -f）导致的分歧分支问题
+            if ! git fetch origin main; then
+                echo "⚠️ Git fetch (HTTPS) 失败，可能是认证问题"
                 echo "🔄 尝试切换到 SSH 协议..."
                 # 获取当前的 remote url 以备恢复
                 OLD_URL=$(git remote get-url origin)
@@ -80,8 +85,8 @@ jobs:
                 # 切换到 SSH
                 git remote set-url origin git@github.com:WilliamsMiao/Headache_trade.git
                 
-                if ! git pull origin main; then
-                   echo "❌ SSH 拉取也失败了"
+                if ! git fetch origin main; then
+                   echo "❌ SSH fetch 也失败了"
                    echo "🔄 恢复原来的 URL: $OLD_URL"
                    git remote set-url origin "$OLD_URL"
                    
@@ -98,13 +103,18 @@ jobs:
                    echo ""
                    echo "2. 或者手动输入一次密码保存凭证:"
                    echo "   git config --global credential.helper store"
-                   echo "   git pull origin main (输入用户名/令牌)"
+                   echo "   git fetch origin main (输入用户名/令牌)"
                    echo "======================================================="
                    exit 1
                 else
-                   echo "✅ 已成功切换到 SSH 协议并拉取了代码"
+                   echo "✅ 已成功切换到 SSH 协议并获取了代码"
                 fi
             fi
+            
+            # 使用 reset --hard 来应用远程分支的最新状态（处理强制推送）
+            echo "🔄 重置本地分支到远程最新状态..."
+            git reset --hard origin/main
+            echo "✅ 代码已同步到最新版本"
             
             echo "📂 当前目录结构:"
             ls -F
