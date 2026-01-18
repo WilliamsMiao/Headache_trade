@@ -15,7 +15,7 @@ from pathlib import Path
 from trading_bots.guidance import save_guidance
 from trading_bots.main_bot import get_btc_ohlcv_enhanced
 from trading_bots.signals import analyze_with_deepseek_trend_king_with_retry
-from trading_bots.config import deepseek_client
+from trading_bots.config import MODEL_NAME, deepseek_client
 
 
 LOG_PATH = Path(os.getenv("COMMANDER_LOG_PATH", "logs/commander.log"))
@@ -98,7 +98,7 @@ def suggest_parameters_from_backtest(metrics: dict):
     )
     try:
         resp = deepseek_client.chat.completions.create(
-            model="deepseek-chat",
+            model=MODEL_NAME,
             messages=[{"role": "system", "content": "You are a concise quant assistant."}, {"role": "user", "content": prompt}],
             temperature=0.3,
             max_tokens=240,
