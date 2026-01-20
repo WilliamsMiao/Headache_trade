@@ -1,18 +1,34 @@
-# Headache Trade V3.0 - 智能交易系统
+# Headache Trade V3.1 - AI交易团队系统
 
-Headache Trade V3.0 是一个基于 DeepSeek AI 的高级加密货币自动化交易系统。本项目采用"趋势为王，结构修边"的核心交易理念，结合量化分析与大模型决策，提供全自动的实盘交易、策略回测及可视化的监控仪表板。
+Headache Trade V3.1 是一个基于多AI Agent协作的高级加密货币自动化交易系统。本项目采用"趋势为王，结构修边"的核心交易理念，通过AI交易团队（市场分析师、量化策略专家、风险管理专家、交易执行专家）协同工作，提供更智能、更全面的交易决策。
 
-## ✨ V3.0 核心特性
+## ✨ V3.1 核心特性
 
-- 🤖 **DeepSeek AI 驱动** - 集成 DeepSeek 大模型，进行深度市场情绪与趋势分析。
-- 📊 **"趋势为王" 策略引擎** - 多因子量化模型（均线系统、MACD、RSI、布林带）实时计算趋势强度。
-- 🎯 **智能动态仓位** - 基于 AI 信心指数与市场波动率（ATR）动态调整杠杆与持仓比例。
-- 🛡️ **三级风控体系** - 硬性止损、动态追踪止盈、ATR 波动保护机制。
-- 📈 **现代化 Web 仪表板** - 基于 Next.js + React 的全新前端，提供账户概览、实时日志、收益曲线及持仓监控，支持响应式设计。
-- ⚡ **自动化流水线** - 标准化 15 分钟交易周期，自动化的数据获取、清洗、分析与下单执行。
-- 📱 **专业级 K 线图表** - 集成高性能 K 线图表组件，实时展示订单执行情况与价格走势。
+- 🤖 **AI交易团队架构** - 四大专业AI技能协同工作：市场分析师、量化策略专家、风险管理专家、交易执行专家
+- 🧠 **技能协调层** - 智能调度、结果聚合、异常熔断，确保系统稳定可靠
+- 📊 **多时间框架分析** - 支持1m/5m/15m/1h/4h/1d多时间框架技术分析
+- 🎯 **动态策略选择** - 根据市场状态自动选择最优策略（趋势跟踪/均值回归/套利等）
+- 🛡️ **智能风险管理** - 动态仓位sizing、最大回撤控制、流动性风险评估、黑天鹅事件检测
+- ⚡ **算法执行优化** - TWAP/VWAP算法执行、滑点优化、智能订单路由
+- 🔄 **渐进式集成** - 不破坏现有系统，支持平滑迁移和回退机制
+- 📈 **现代化 Web 仪表板** - 基于 Next.js + React 的全新前端，提供账户概览、实时日志、收益曲线及持仓监控
+- 📱 **专业级 K 线图表** - 集成高性能 K 线图表组件，实时展示订单执行情况与价格走势
 
 ## 更新日志
+
+### V3.1 (2026-01-15) - AI交易团队重大更新
+- 🤖 **AI交易团队架构**: 引入多Agent协作系统，四大专业AI技能协同工作
+  - **Market Analyst Skill**: 多时间框架技术分析、市场情绪分析、异常检测
+  - **Quant Strategist Skill**: 动态策略选择、参数自适应优化、信号生成
+  - **Risk Manager Skill**: 动态仓位sizing、最大回撤控制、流动性风险评估、黑天鹅检测
+  - **Trade Executor Skill**: 智能订单路由、TWAP算法执行、滑点优化
+- 🧠 **技能协调层**: 实现SkillCoordinator，负责技能调度、结果聚合、异常熔断
+- 🔄 **上下文管理**: 实现ContextManager，维护跨技能共享的上下文数据
+- 📡 **消息总线**: 实现MessageBus，支持技能间事件驱动通信
+- 🔌 **适配层**: 实现DataAdapter和PerformanceMonitor，桥接新旧系统
+- 🛡️ **熔断保护**: 实现CircuitBreaker，防止连续失败导致系统崩溃
+- 📊 **性能监控**: 自动记录每个技能的执行时间、成功率等指标
+- 🔙 **回退机制**: AI技能失败时自动降级到传统策略，确保系统稳定性
 
 ### V3.0 (2026-01-15)
 - 🗂️ **项目结构规范化**: 重构项目目录结构，符合专业代码项目规范
@@ -79,6 +95,16 @@ nano .env
 - `DEEPSEEK_API_KEY`: DeepSeek 大模型接口密钥
 - `OKX_API_KEY`, `OKX_SECRET`, `OKX_PASSWORD`: OKX 交易所 V5 API
 
+*AI交易团队配置（可选）：*
+- `AI_SKILLS_ENABLED=true`: 启用AI交易团队（默认启用）
+- `AI_MARKET_ANALYST_ENABLED=true`: 启用市场分析师技能
+- `AI_QUANT_STRATEGIST_ENABLED=true`: 启用量化策略专家技能
+- `AI_RISK_MANAGER_ENABLED=true`: 启用风险管理专家技能
+- `AI_TRADE_EXECUTOR_ENABLED=true`: 启用交易执行专家技能
+- `AI_SKILL_TIMEOUT=5.0`: 技能执行超时时间（秒）
+- `AI_CIRCUIT_BREAKER_ENABLED=true`: 启用熔断器保护
+- `AI_FALLBACK_LEGACY=true`: AI失败时回退到传统策略
+
 ### 4. 启动系统
 ```bash
 ./run.sh
@@ -87,10 +113,10 @@ nano .env
 - 🤖 **交易机器人**将在后台运行 (PID 记录于 `logs/bot.log`)
 - 📊 **Web 仪表板**将启动在前台，访问地址：`http://localhost:5000`
 
-## 📁 项目结构 (V3.0)
+## 📁 项目结构 (V3.1)
 
 ```text
-Headache_trade-1/
+Headache_trade/
 ├── run.sh                        # [入口] 系统一键启动脚本
 ├── deploy.sh                     # [入口] 环境部署脚本
 ├── restart_bot_safe.sh           # [工具] 安全重启脚本（保护现有持仓）
@@ -99,14 +125,33 @@ Headache_trade-1/
 │   ├── routes/                   # API路由层
 │   ├── services/                 # 业务逻辑层
 │   └── repositories/             # 数据访问层
+├── ai_skills/                    # [新] AI交易团队技能系统
+│   ├── __init__.py               # 模块导出
+│   ├── base_skill.py             # 基础技能抽象类
+│   ├── coordinator.py            # 技能协调层
+│   ├── context_manager.py        # 上下文管理器
+│   ├── messaging.py              # 消息传递机制
+│   ├── config.py                 # AI技能配置
+│   ├── adapters.py               # 适配层（数据转换、性能监控）
+│   ├── market_analyst.py         # 市场分析师技能
+│   ├── quant_strategist.py       # 量化策略专家技能
+│   ├── risk_manager.py          # 风险管理专家技能
+│   ├── trade_executor.py         # 交易执行专家技能
+│   └── README.md                 # AI技能系统使用说明
 ├── trading_bots/                 # [核心] 交易策略模块
-│   ├── main_bot.py               # >>> V3.0 主策略引擎 (优化的交易执行逻辑)
+│   ├── main_bot.py               # >>> V3.1 主策略引擎 (集成AI交易团队)
 │   ├── risk.py                   # 完善的风控模块
 │   ├── execution.py              # 增强的订单执行模块
-│   ├── ai_commander.py           # AI 决策引擎
+│   ├── ai_commander.py           # AI 决策引擎（传统模式）
 │   ├── signals.py                # 信号生成模块
 │   └── indicators.py             # 技术指标计算
-├── frontend_dashboard/           # [新] 现代化 Next.js 前端应用
+├── strategies/                   # [策略] 策略实现模块
+│   ├── base_strategy.py          # 策略基类
+│   ├── strategy_registry.py      # 策略注册表
+│   ├── trend_strategy.py         # 趋势策略
+│   ├── grid_strategy.py          # 网格策略
+│   └── ...                       # 其他策略实现
+├── frontend_dashboard/           # [前端] 现代化 Next.js 前端应用
 │   ├── app/                      # Next.js 应用目录
 │   │   ├── page.tsx              # 主页面
 │   │   ├── layout.tsx            # 全局布局
@@ -138,6 +183,8 @@ Headache_trade-1/
 ├── data/                         # [数据] 本地数据存储
 │   ├── backtest_summary.csv      # 回测汇总报告
 │   ├── dashboard_data.json       # 仪表板数据
+│   ├── ai_skills_context.json    # AI技能上下文（自动生成）
+│   ├── ai_skills_performance.json # AI技能性能指标（自动生成）
 │   ├── guidance.json             # 交易指导数据
 │   ├── chart_history.json        # K线历史数据
 │   └── backtest/                 # 回测结果存储
@@ -192,6 +239,75 @@ npm run dev
   pkill -f "dashboard/app.py"
   ```
 
+## 🤖 AI交易团队架构
+
+### 系统架构
+
+```
+┌─────────────────────────────────────────┐
+│      Skill Coordinator (协调层)        │
+│  • 技能调度 • 结果聚合 • 异常熔断      │
+└─────────────────────────────────────────┘
+         │
+    ┌────┴────┬──────────┬──────────┐
+    │         │          │          │
+┌───▼───┐ ┌──▼───┐ ┌───▼───┐ ┌───▼───┐
+│Market │ │Quant │ │ Risk  │ │Trade  │
+│Analyst│ │Strat │ │Manager│ │Executor│
+└───────┘ └──────┘ └───────┘ └───────┘
+```
+
+### 四大AI技能
+
+#### 1. Market Analyst Skill (市场分析师)
+- **多时间框架分析**: 支持1m/5m/15m/1h/4h/1d多时间框架技术分析
+- **市场情绪分析**: 集成Twitter/Reddit/Telegram情绪指标
+- **异常检测**: 价格突变、流动性枯竭、极端波动率检测
+- **输出**: 标准化市场状态报告（趋势强度、波动率、情绪得分、异常标志）
+
+#### 2. Quant Strategist Skill (量化策略专家)
+- **动态策略选择**: 根据市场状态自动选择最优策略（趋势跟踪/均值回归/套利/机器学习）
+- **参数自适应优化**: 基于当前市场状态动态调整策略参数
+- **多策略组合**: 支持多策略权重分配和信号置信度评估
+- **输出**: 原始交易信号（方向、规模、入场/出场条件）
+
+#### 3. Risk Manager Skill (风险管理专家)
+- **动态仓位sizing**: 基于波动率和相关性动态调整仓位大小
+- **最大回撤控制**: 单策略/整体组合的最大回撤监控
+- **流动性风险评估**: 买卖价差、深度分析
+- **黑天鹅事件检测**: 极端行情熔断机制
+- **输出**: 风险调整后的最终交易信号
+
+#### 4. Trade Executor Skill (交易执行专家)
+- **智能订单路由**: 最优交易所选择（当前支持OKX，可扩展）
+- **算法执行**: TWAP/VWAP/冰山订单算法
+- **滑点优化**: 动态订单拆分，减少市场冲击
+- **执行质量监控**: 实时跟踪执行时间、滑点、成交率
+- **输出**: 执行报告（成交记录、性能指标）
+
+### 数据流
+
+```
+1. 数据获取 → Market Analyst → 市场状态报告
+2. 市场状态 + 历史数据 → Quant Strategist → 原始信号
+3. 原始信号 + 组合状态 → Risk Manager → 最终信号
+4. 最终信号 + 市场深度 → Trade Executor → 执行结果
+5. 执行结果 → 反馈到上下文 → 下一个周期
+```
+
+### 核心机制
+
+- **技能协调层**: 统一调度所有技能，管理执行流程
+- **上下文管理**: 维护跨技能共享的上下文数据（市场状态、策略信号、风险参数）
+- **消息总线**: 支持技能间事件驱动通信
+- **熔断保护**: 技能连续失败时自动熔断，防止系统崩溃
+- **回退机制**: AI技能失败时自动降级到传统策略，确保系统稳定性
+- **性能监控**: 自动记录每个技能的执行时间、成功率等指标
+
+### 配置说明
+
+详细配置说明请参考 [AI技能系统文档](ai_skills/README.md)
+
 ## 🎯 策略详情
 
 ### 趋势判断标准
@@ -205,11 +321,15 @@ npm run dev
 - **基础仓位**: 默认 10% 账户权益
 - **杠杆倍数**: 3x - 10x (动态调整)
 - **调整逻辑**: AI 信心分 > 8 且趋势分 > 7 时触发加仓；ATR 剧烈波动时自动降维。
+- **AI增强**: 通过Risk Manager Skill进行动态仓位sizing和风险控制
 
 ## 🔒用于生产环境的安全建议
 1.  **Key 权限**: OKX API Key 务必仅开启 **"交易"** 与 **"读取"** 权限，**严禁开启"提币"权限**。
 2.  **IP 白名单**: 建议将 API Key 绑定服务器 IP。
 3.  **日志监控**: 定期检查 `logs/bot.log` 确保运行正常。
+4.  **AI技能监控**: 定期检查 `data/ai_skills_performance.json` 监控AI技能执行情况。
+5.  **熔断保护**: 确保 `AI_CIRCUIT_BREAKER_ENABLED=true` 启用熔断器保护。
+6.  **回退机制**: 建议保持 `AI_FALLBACK_LEGACY=true` 确保AI失败时能回退到传统策略。
 
 ## 📄 License & 免责声明
 本项目基于 MIT License 开源。
