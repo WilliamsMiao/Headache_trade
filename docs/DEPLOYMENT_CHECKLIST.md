@@ -34,7 +34,7 @@ cat ~/Headache_trade-1/.env | head -5
 
 #### 检查后端服务 (Flask - 端口 5001)
 ```bash
-ps aux | grep trading_dashboard.py | grep -v grep
+ps aux | grep "dashboard/app.py" | grep -v grep
 netstat -tlnp | grep 5001
 curl http://localhost:5001/health  # 如果有健康检查接口
 ```
@@ -111,7 +111,7 @@ lsof -i :5001
 lsof -i :3000
 
 # 杀死旧进程
-pkill -f "trading_dashboard.py"
+pkill -f "dashboard/app.py"
 pkill -f "next dev"
 
 # 重新启动
@@ -173,7 +173,7 @@ cd ~/Headache_trade-1 && git log -1 --oneline
 # 2. 检查进程
 echo ""
 echo "🔄 进程状态:"
-if pgrep -f "trading_dashboard.py" > /dev/null; then
+if pgrep -f "dashboard/app.py" > /dev/null; then
     echo "✅ 后端进程运行中"
 else
     echo "❌ 后端进程未运行"

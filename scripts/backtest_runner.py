@@ -19,6 +19,16 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from scripts.backtest_engine import BacktestEngine
 from scripts.backtest_analyzer import BacktestAnalyzer
 
+# 导入策略系统
+try:
+    from strategies.strategy_adapter import create_backtest_strategy, create_backtest_strategy_from_name
+    from strategies.strategy_registry import StrategyRegistry
+    from strategies.base_strategy import BaseStrategy
+    STRATEGY_SYSTEM_AVAILABLE = True
+except ImportError:
+    STRATEGY_SYSTEM_AVAILABLE = False
+    print("警告: 策略系统未找到，将使用默认策略函数")
+
 # 加载环境变量
 load_dotenv()
 
@@ -605,7 +615,11 @@ def run_backtest(df: pd.DataFrame, config: Dict = None) -> Dict:
     
     Args:
         df: 历史K线数据
-        config: 回测配置
+        config: 回测配置，可包含：
+            - strategy_name: 策略名称（如 'signal', 'trend', 'grid', 'martingale'）
+            - strategy_params: 策略参数字典
+            - strategy_instance: 策略实例（BaseStrategy）
+            如果未指定，使用默认策略函数
         
     Returns:
         回测结果
@@ -630,14 +644,75 @@ def run_backtest(df: pd.DataFrame, config: Dict = None) -> Dict:
     )
     
     # 创建策略函数
-    strategy_func = create_strategy_function()
+    strategy_func = None
+    
+    # 优先使用策略系统
+    if STRATEGY_SYSTEM_AVAILABLE:
+        # 方式1: 使用策略实例
+        if 'strategy_instance' in config:
+            strategy_instance = config['strategy_instance']
+            if isinstance(strategy_instance, BaseStrategy):
+                strategy_func = create_backtest_strategy(strategy_instance)
+        
+        # 方式2: 使用策略名称和参数
+        elif 'strategy_name' in config:
+            strategy_name = config['strategy_name']
+            strategy_params = config.get('strategy_params', {})
+            try:
+                strategy_func = create_backtest_strategy_from_name(
+                    strategy_name, strategy_params
+                )
+            except Exception as e:
+                print(f"警告: 无法创建策略 '{strategy_name}': {e}")
+                print("回退到默认策略函数")
+    
+    # 回退到默认策略函数
+    if strategy_func is None:
+        strategy_func = create_strategy_function()
     
     # 运行回测
-    results = engine.run(df, strategy_func, verbose=True)
+    verbose = config.get('verbose', True)
+    results = engine.run(df, strategy_func, verbose=verbose)
+    
     # 追加信号日志，便于后续分析
     results['signal_log'] = getattr(strategy_func, 'signal_log', [])
     
+    # 如果使用策略系统，添加策略信息
+    if hasattr(strategy_func, 'strategy_name'):
+        results['strategy_name'] = strategy_func.strategy_name
+        if hasattr(strategy_func, 'strategy_instance'):
+            results['strategy_params'] = strategy_func.strategy_instance.get_parameters()
+    
     return results
+
+
+def run_backtest_with_strategy(
+    df: pd.DataFrame,
+    strategy_name: str = None,
+    strategy_params: Dict = None,
+    backtest_config: Dict = None
+) -> Dict:
+    """
+    使用策略类运行回测（便捷函数）
+    
+    Args:
+        df: 历史K线数据
+        strategy_name: 策略名称（如 'signal', 'trend', 'grid', 'martingale'）
+        strategy_params: 策略参数字典
+        backtest_config: 回测配置（初始资金、杠杆等）
+        
+    Returns:
+        回测结果
+    """
+    if backtest_config is None:
+        backtest_config = {}
+    
+    if strategy_name:
+        backtest_config['strategy_name'] = strategy_name
+        if strategy_params:
+            backtest_config['strategy_params'] = strategy_params
+    
+    return run_backtest(df, backtest_config)
 
 
 def main():
@@ -647,11 +722,22 @@ def main():
     parser.add_argument('--days', type=int, default=30, help='数据天数（默认30天）')
     parser.add_argument('--config', type=str, help='配置文件名（如baseline）')
     parser.add_argument('--data-file', type=str, help='指定数据文件路径')
+    parser.add_argument('--strategy', type=str, help='策略名称（如 signal, trend, grid, martingale）')
+    parser.add_argument('--strategy-params', type=str, help='策略参数（JSON字符串）')
     
     args = parser.parse_args()
     
     # 数据文件路径
     data_file = args.data_file or f"{DATA_DIR}/historical_15m_{args.days}d.json"
+    
+    # 解析策略参数
+    strategy_params = {}
+    if args.strategy_params:
+        try:
+            strategy_params = json.loads(args.strategy_params)
+        except json.JSONDecodeError as e:
+            print(f"错误: 无法解析策略参数JSON: {e}")
+            return
     
     # 1. 获取或加载历史数据
     if args.fetch_data:
@@ -673,7 +759,9 @@ def main():
         'initial_balance': 100,
         'leverage': 6,
         'fee_rate': 0.001,
-        'slippage': 0.0001
+        'slippage': 0.0001,
+        'funding_rate': 0.0001,
+        'verbose': True
     }
     
     if args.config:
@@ -683,6 +771,15 @@ def main():
                 user_config = json.load(f)
                 config.update(user_config)
             print(f"✅ 已加载配置: {config_file}")
+    
+    # 如果指定了策略，使用策略系统
+    if args.strategy:
+        config['strategy_name'] = args.strategy
+        if strategy_params:
+            config['strategy_params'] = strategy_params
+        print(f"✅ 使用策略: {args.strategy}")
+        if strategy_params:
+            print(f"   策略参数: {strategy_params}")
     
     # 3. 运行回测
     results = run_backtest(df, config)

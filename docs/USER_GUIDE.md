@@ -92,7 +92,7 @@ nohup python trading_bots/main_bot.py > logs/bot.log 2>&1 &
 
 ## 5. 可视化监控 (Web Dashboard)
 
-启动 `trading_dashboard.py` 后，您可以通过浏览器实时监控：
+启动 Dashboard 服务（`python -m dashboard` 或 `./start_services.sh`）后，您可以通过浏览器实时监控：
 - **账户概览**: 实时显示账户余额、可用保证金。
 - **持仓状态**: 展示当前持仓的入场价、强平价、未实现盈亏。
 - **实时日志**: 无需终端，直接在网页查看机器人的决策逻辑。
@@ -112,7 +112,7 @@ nohup python trading_bots/main_bot.py > logs/bot.log 2>&1 &
 | **查看机器人日志** | `tail -f logs/bot.log` |
 | **查看 Web 服务日志** | `tail -f logs/dashboard.log` |
 | **运行 AI 优化回测** | `python scripts/backtest_runner.py --ai-feedback` |
-| **手动停止所有进程** | `pkill -f main_bot.py && pkill -f trading_dashboard.py` |
+| **手动停止所有进程** | `pkill -f main_bot.py && pkill -f "dashboard/app.py"` |
 | **检查系统运行状态** | `./scripts/check_status.sh` |
 
 ---

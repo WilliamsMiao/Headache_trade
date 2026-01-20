@@ -105,7 +105,7 @@
 ### 停止所有服务
 ```bash
 # 停止 Web 服务
-pkill -f "trading_dashboard.py"
+pkill -f "dashboard/app.py"
 pkill -f "next dev"
 
 # 停止交易 Bot

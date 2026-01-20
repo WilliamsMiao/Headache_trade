@@ -257,10 +257,30 @@ class BacktestEngine:
                     if verbose and self.total_trades <= 10:
                         print(f"🎯 止盈平仓 | 价格: {exit_price:.2f} | 盈亏: {self.trades[-1].pnl_pct*100:.2f}%")
             
-            # 如果没有持仓，调用策略函数获取信号
-            if self.position is None:
-                signal = strategy_func(i, df, self.position, self.balance, self.get_performance_stats())
-                
+            # 调用策略函数获取信号（无论是否有持仓）
+            signal = strategy_func(i, df, self.position, self.balance, self.get_performance_stats())
+            
+            # 处理CLOSE信号（平仓）
+            if signal and signal.get('action') == 'CLOSE':
+                if self.position is not None:
+                    close_size = signal.get('size', self.position.size)
+                    # 确保不超过持仓
+                    close_size = min(close_size, self.position.size)
+                    if close_size > 0:
+                        # 部分平仓或全部平仓
+                        if close_size >= self.position.size:
+                            # 全部平仓
+                            self.close_position(close_price, timestamp, signal.get('reason', '策略平仓'))
+                            if verbose and self.total_trades <= 10:
+                                print(f"🔄 策略平仓 | 价格: {close_price:.2f} | 原因: {signal.get('reason', 'N/A')}")
+                        else:
+                            # 部分平仓（简化处理：全部平仓）
+                            self.close_position(close_price, timestamp, signal.get('reason', '策略部分平仓'))
+                            if verbose and self.total_trades <= 10:
+                                print(f"🔄 策略部分平仓 | 价格: {close_price:.2f} | 数量: {close_size}张")
+            
+            # 如果没有持仓，处理开仓信号
+            elif self.position is None:
                 if signal and signal.get('action') in ['BUY', 'SELL']:
                     # 执行开仓
                     action = signal['action']

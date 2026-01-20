@@ -74,7 +74,7 @@ cd ~/Headache_trade-1
 git pull origin main
 
 # 停止旧服务
-pkill -f "trading_dashboard.py" 2>/dev/null || true
+pkill -f "dashboard/app.py" 2>/dev/null || true
 pkill -f "next dev" 2>/dev/null || true
 sleep 2
 
@@ -224,7 +224,7 @@ ps aux | grep trading_dashboard
 tail -f logs/dashboard.log
 
 # 如果后端未启动，手动启动
-python3 trading_dashboard.py > logs/dashboard.log 2>&1 &
+python3 -m dashboard > logs/dashboard.log 2>&1 &
 ```
 
 ---

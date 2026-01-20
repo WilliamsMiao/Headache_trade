@@ -1220,7 +1220,7 @@ def wait_for_next_period():
     return seconds_to_wait
 
 def trading_bot(immediate=False):
-    """主交易机器人函数 - 使用趋势为王策略"""
+    """主交易机器人函数 - 集成AI交易团队"""
     # 等待到整点再执行（除非立即执行）
     if not immediate:
         wait_seconds = wait_for_next_period()
@@ -1228,7 +1228,7 @@ def trading_bot(immediate=False):
             time.sleep(wait_seconds)
 
     print("\n" + "=" * 60)
-    print(f"🎯 趋势为王策略执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"🎯 AI交易团队执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
 
     # 0. 检查市场情绪API健康状态
@@ -1250,16 +1250,67 @@ def trading_bot(immediate=False):
     print(f"数据周期: {TRADE_CONFIG['timeframe']}")
     print(f"价格变化: {price_data['price_change']:+.2f}%")
 
-    # 2. 使用指导缓存的趋势为王信号（非阻塞，指挥官异步更新 guidance）
+    # 2. 尝试使用AI交易团队（如果启用）
+    use_ai_team = os.getenv("AI_SKILLS_ENABLED", "true").lower() == "true"
+    
+    if use_ai_team:
+        try:
+            from ai_skills.coordinator import SkillCoordinator
+            from ai_skills.adapters import DataAdapter, performance_monitor
+            
+            # 初始化协调器
+            coordinator = SkillCoordinator.get_instance()
+            
+            # 转换数据格式
+            adapter = DataAdapter()
+            market_data = adapter.convert_market_data(price_data)
+            
+            # 执行AI交易周期
+            ai_decision = coordinator.execute_trading_cycle(market_data)
+            
+            if ai_decision:
+                # 转换AI决策为现有系统格式
+                signal_data = adapter.convert_signal(ai_decision)
+                
+                # 记录性能
+                performance_monitor.track_coordinator_performance({
+                    'last_execution': datetime.now().isoformat(),
+                    'decision': ai_decision.get('action', 'HOLD')
+                })
+                
+                # 执行交易（如果Trade Executor没有执行）
+                if ai_decision.get('action') in ['BUY', 'SELL', 'CLOSE']:
+                    # Trade Executor应该已经执行了，这里只做备用处理
+                    if not ai_decision.get('execution_status'):
+                        execute_intelligent_trade(signal_data, price_data)
+                
+                # 导出数据到Dashboard
+                export_dashboard_data(price_data, signal_data)
+                
+                # 记录市场情绪API监控状态（每10次交易记录一次）
+                if len(signal_history) % 10 == 0:
+                    sentiment_health = check_sentiment_api_health()
+                    print(f"📊 市场情绪API监控: {sentiment_health}")
+                
+                return
+            
+        except Exception as e:
+            print(f"⚠️ AI交易团队执行失败，回退到传统策略: {e}")
+            import traceback
+            traceback.print_exc()
+            # 继续执行传统策略
+    
+    # 3. 回退到传统策略（如果AI团队未启用或失败）
+    # 使用指导缓存的趋势为王信号（非阻塞，指挥官异步更新 guidance）
     signal_data = generate_signal_with_guidance(price_data)
 
-    # 3. 执行智能交易（已集成趋势为王策略）
+    # 4. 执行智能交易（已集成趋势为王策略）
     execute_intelligent_trade(signal_data, price_data)
     
-    # 4. 导出数据到Dashboard
+    # 5. 导出数据到Dashboard
     export_dashboard_data(price_data, signal_data)
     
-    # 5. 记录市场情绪API监控状态（每10次交易记录一次）
+    # 6. 记录市场情绪API监控状态（每10次交易记录一次）
     if len(signal_history) % 10 == 0:
         sentiment_health = check_sentiment_api_health()
         print(f"📊 市场情绪API监控: {sentiment_health}")
@@ -1278,11 +1329,26 @@ def setup_exchange():
         return False
 
 def main():
-    """主函数 - 集成价格监控和趋势为王策略"""
-    print("🚀 BTC/USDT 趋势为王交易机器人启动")
+    """主函数 - 集成AI交易团队和价格监控"""
+    print("🚀 BTC/USDT AI交易团队启动")
     print("✅ 基于'趋势为王，结构修边'理念优化")
-    print("🎯 核心特性: 趋势强度量化 + 结构时机优化 + 智能仓位管理")
+    print("🎯 核心特性: AI交易团队 + 趋势强度量化 + 结构时机优化 + 智能仓位管理")
     print("✅ 实时价格监控 + 动态止盈止损")
+    
+    # 检查AI技能是否启用
+    use_ai_team = os.getenv("AI_SKILLS_ENABLED", "true").lower() == "true"
+    if use_ai_team:
+        print("🤖 AI交易团队已启用")
+        try:
+            from ai_skills.coordinator import SkillCoordinator
+            coordinator = SkillCoordinator.get_instance()
+            status = coordinator.get_coordinator_status()
+            print(f"   - 已加载 {status['skills_count']} 个AI技能: {', '.join(status['skills'])}")
+        except Exception as e:
+            print(f"⚠️ AI交易团队初始化失败: {e}")
+            print("   将使用传统策略")
+    else:
+        print("📊 使用传统策略系统")
     
     if not setup_exchange():
         print("❌ 交易所初始化失败")

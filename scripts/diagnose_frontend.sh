@@ -148,7 +148,7 @@ else
     echo "   ❌ Next.js 开发服务器未运行"
 fi
 
-if pgrep -f "trading_dashboard.py" > /dev/null; then
+if pgrep -f "dashboard/app.py" > /dev/null; then
     echo "   ✅ Flask 后端服务正在运行"
 else
     echo "   ❌ Flask 后端服务未运行"

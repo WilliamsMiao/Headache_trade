@@ -124,6 +124,9 @@ performance_tracker = {
 
 signal_history = []
 
+# AI Skills Configuration (can be overridden by environment variables)
+AI_SKILLS_ENABLED = os.getenv("AI_SKILLS_ENABLED", "true").lower() == "true"
+
 __all__ = [
     "deepseek_client",
     "exchange",
@@ -141,4 +144,5 @@ __all__ = [
     "PROTECTION_LEVELS",
     "performance_tracker",
     "signal_history",
+    "AI_SKILLS_ENABLED",
 ]

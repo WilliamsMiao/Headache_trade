@@ -19,12 +19,13 @@ else
 fi
 
 echo "🔄 Stopping existing services..."
-pkill -f "trading_dashboard.py" 2>/dev/null || true
+pkill -f "dashboard/app.py" 2>/dev/null || true
+pkill -f "dashboard/app.py" 2>/dev/null || true
 pkill -f "next dev" 2>/dev/null || true
 
 start_backend() {
   echo "🚀 Starting Flask backend on port ${BACKEND_PORT}..."
-  nohup "$PY_BIN" "$ROOT_DIR/trading_dashboard.py" > "$BACKEND_LOG" 2>&1 &
+  nohup "$PY_BIN" -m dashboard > "$BACKEND_LOG" 2>&1 &
   BACKEND_PID=$!
   for _ in {1..30}; do
     if nc -z 127.0.0.1 "$BACKEND_PORT" 2>/dev/null; then

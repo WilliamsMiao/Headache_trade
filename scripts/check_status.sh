@@ -10,9 +10,9 @@ echo "📊 检查进程状态:"
 echo ""
 
 echo "1️⃣ 后端服务 (Flask API):"
-if pgrep -f "trading_dashboard.py" > /dev/null; then
+if pgrep -f "dashboard/app.py" > /dev/null; then
     echo "   ✅ 后端进程正在运行"
-    ps aux | grep trading_dashboard.py | grep -v grep | head -1
+    ps aux | grep "dashboard/app.py" | grep -v grep | head -1
 else
     echo "   ❌ 后端进程未运行"
 fi
